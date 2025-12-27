@@ -15,7 +15,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- CONFIGURAÇÃO SUPABASE ---
+        // CONFIGURAÇÃO DOS SEUS DADOS DO PRINT
         const SUPABASE_URL = 'https://zxjegvonpiuyfplkonkb.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4amVndm9ucGl1eWZwbGtvbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4NDQwNjMsImV4cCI6MjA4MjQyMDA2M30.P-EkAuX1LiM5hybYYVaaUvMd04LgV7w0-GDkealXbwo';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -26,7 +26,7 @@
             const [searchTerm, setSearchTerm] = useState('');
             const [loading, setLoading] = useState(true);
             const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
-            const [formData, setFormData] = useState({ attendantName: '', store: '', date: new Date().toISOString().split('T')[0], file: null });
+            const [formData, setFormData] = useState({ attendantName: '', store: '', file: null });
 
             useEffect(() => {
                 localStorage.setItem('darkMode', darkMode);
@@ -43,15 +43,16 @@
             const handleUpload = async () => {
                 if (!formData.attendantName || !formData.file) return alert('Preencha o nome e escolha a foto!');
                 
-                const fileName = `${Date.now()}_${formData.attendantName.replace(/\s/g, '_')}_${formData.store}_${formData.file.name}`;
+                // Salva com nome: timestamp_nome_loja_arquivo
+                const fileName = `${Date.now()}_${formData.attendantName.replace(/\s/g, '_')}_${formData.store.replace(/\s/g, '_')}_${formData.file.name}`;
                 
                 const { error } = await supabaseClient.storage.from('atestados').upload(fileName, formData.file);
 
                 if (error) {
-                    alert('Erro ao subir: ' + error.message + '. Verifique as Policies no Supabase!');
+                    alert('Erro ao subir: ' + error.message);
                 } else {
-                    alert('Atestado salvo na nuvem!');
-                    setFormData({ ...formData, attendantName: '', file: null });
+                    alert('Atestado salvo na nuvem com sucesso!');
+                    setFormData({ attendantName: '', store: '', file: null });
                     setShowForm(false);
                     fetchCertificates();
                 }
@@ -68,41 +69,41 @@
                             <div className="flex justify-between items-center mb-6">
                                 <h1 className="text-2xl font-bold">Controle de Atestados</h1>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setDarkMode(!darkMode)} className="p-2 border rounded-lg">
+                                    <button onClick={() => setDarkMode(!darkMode)} className="p-2 border rounded-lg bg-opacity-20 bg-gray-400">
                                         {darkMode ? '☀️ Modo Claro' : '🌙 Modo Escuro'}
                                     </button>
                                     <button onClick={() => setShowForm(!showForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg">
-                                        + Novo
+                                        {showForm ? 'Fechar' : '+ Novo Atestado'}
                                     </button>
                                 </div>
                             </div>
 
                             {showForm && (
-                                <div className="space-y-4 p-4 border rounded-xl mb-4 bg-opacity-50">
-                                    <input type="text" placeholder="Nome" className="w-full p-2 border rounded text-black" 
+                                <div className={`p-4 border rounded-xl mb-4 space-y-3 ${darkMode ? 'bg-gray-700' : 'bg-indigo-50'}`}>
+                                    <input type="text" placeholder="Nome da Atendente" className="w-full p-2 border rounded text-black" 
                                         value={formData.attendantName} onChange={e => setFormData({...formData, attendantName: e.target.value})} />
                                     <input type="text" placeholder="Loja" className="w-full p-2 border rounded text-black" 
                                         value={formData.store} onChange={e => setFormData({...formData, store: e.target.value})} />
                                     <input type="file" onChange={e => setFormData({...formData, file: e.target.files[0]})} className="w-full" />
-                                    <button onClick={handleUpload} className="w-full bg-green-600 text-white p-2 rounded">Salvar na Nuvem</button>
+                                    <button onClick={handleUpload} className="w-full bg-green-600 text-white p-2 rounded font-bold">Enviar para Nuvem</button>
                                 </div>
                             )}
 
-                            <input type="text" placeholder="🔍 Buscar por nome ou loja..." className="w-full p-2 border rounded text-black"
+                            <input type="text" placeholder="🔍 Buscar por nome ou loja..." className="w-full p-3 border rounded-xl text-black"
                                 value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                         </div>
 
                         <div className="grid gap-4">
-                            {loading ? <p>Carregando arquivos da nuvem...</p> : filteredCertificates.map(cert => {
+                            {loading ? <p className="text-center">Acessando banco de dados...</p> : filteredCertificates.map(cert => {
                                 const { data } = supabaseClient.storage.from('atestados').getPublicUrl(cert.name);
                                 const partes = cert.name.split('_');
                                 return (
-                                    <div key={cert.id} className={`p-4 rounded-xl border-2 flex gap-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
-                                        <img src={data.publicUrl} className="w-24 h-24 object-cover rounded-lg cursor-pointer" onClick={() => window.open(data.publicUrl)} />
+                                    <div key={cert.id} className={`p-4 rounded-xl border-2 flex gap-4 items-center shadow-md ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+                                        <img src={data.publicUrl} className="w-24 h-24 object-cover rounded-lg cursor-pointer hover:scale-105 transition" onClick={() => window.open(data.publicUrl)} />
                                         <div>
-                                            <p className="font-bold text-lg">{partes[1] || 'Atestado'}</p>
-                                            <p className="text-sm opacity-70">Loja: {partes[2] || 'Não informada'}</p>
-                                            <p className="text-xs opacity-50">Data: {new Date(parseInt(partes[0])).toLocaleString()}</p>
+                                            <p className="font-bold text-xl text-indigo-500">{partes[1] ? partes[1].replace(/_/g, ' ') : 'Atestado'}</p>
+                                            <p className="opacity-80 font-medium">Loja: {partes[2] ? partes[2].replace(/_/g, ' ') : '---'}</p>
+                                            <p className="text-xs opacity-50">Enviado: {new Date(parseInt(partes[0])).toLocaleString('pt-BR')}</p>
                                         </div>
                                     </div>
                                 );
