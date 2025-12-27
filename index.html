@@ -11,15 +11,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s, color 0.3s; }
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.2s; margin: 0; }
         .text-alcans { color: #FF5C00; }
         .bg-alcans { background-color: #FF5C00; }
-        
-        /* Ajustes para o seletor de data no tema escuro */
         .dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
     </style>
 </head>
-<body class="bg-white text-black">
+<body class="bg-black text-white">
     <div id="root"></div>
     <script type="text/babel">
         const { useState, useEffect } = React;
@@ -33,12 +31,12 @@
             const [files, setFiles] = useState([]);
             const [search, setSearch] = useState('');
             const [loading, setLoading] = useState(false);
-            const [isDark, setIsDark] = useState(true); // Começa no modo escuro padrão Alcans
+            const [isDark, setIsDark] = useState(true);
             const [form, setForm] = useState({ name: '', store: '', start: '', end: '', file: null });
 
             useEffect(() => {
                 loadFiles();
-                document.body.className = isDark ? 'bg-black text-white dark' : 'bg-gray-50 text-black';
+                document.body.className = isDark ? 'bg-black text-white dark' : 'bg-gray-100 text-black';
             }, [isDark]);
 
             const loadFiles = async () => {
@@ -73,68 +71,63 @@
             };
 
             return (
-                <div className="min-h-screen pb-10">
-                    <header className={`p-6 flex justify-between items-center border-b ${isDark ? 'border-white/10 bg-black/90' : 'border-black/10 bg-white/90'} sticky top-0 backdrop-blur-md z-50 transition-colors`}>
-                        <div className="flex items-center gap-4">
-                            <div>
+                <div className="min-h-screen flex flex-col items-center p-4">
+                    {/* Header Compacto e Centralizado */}
+                    <header className={`w-full max-w-md flex justify-between items-center py-6 mb-4`}>
+                        <div className="flex items-center gap-3">
+                            <div className="flex flex-col">
                                 <h1 className="text-2xl font-black italic text-alcans tracking-tighter leading-none">ALCANS</h1>
-                                <p className={`text-[9px] uppercase tracking-[0.3em] font-bold mt-1 ${isDark ? 'text-white/60' : 'text-black/60'}`}>
+                                <p className={`text-[9px] uppercase tracking-[0.2em] font-bold mt-1 ${isDark ? 'text-white/50' : 'text-black/50'}`}>
                                     Registros de Atestados
                                 </p>
                             </div>
-                            <button onClick={() => setIsDark(!isDark)} className={`p-2 rounded-full ${isDark ? 'bg-white/5 text-yellow-400' : 'bg-black/5 text-orange-600'} transition-all`}>
+                            <button onClick={() => setIsDark(!isDark)} className="text-lg opacity-70 hover:opacity-100 transition">
                                 {isDark ? '☀️' : '🌙'}
                             </button>
                         </div>
-                        <button onClick={() => setView(view === 'list' ? 'add' : 'list')} className="bg-alcans text-white px-6 py-2 rounded-full font-bold text-xs uppercase tracking-widest shadow-lg shadow-orange-600/30 active:scale-95 transition">
-                            {view === 'list' ? '+ Novo Registro' : 'Voltar'}
+                        <button onClick={() => setView(view === 'list' ? 'add' : 'list')} className="bg-alcans text-white px-5 py-2 rounded-full font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-orange-600/20 active:scale-95 transition">
+                            {view === 'list' ? '+ Novo' : 'Voltar'}
                         </button>
                     </header>
 
-                    <main className="max-w-xl mx-auto p-4 pt-8 text-center">
+                    <main className="w-full max-w-md">
                         {view === 'add' ? (
-                            <div className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-xl'} p-8 rounded-[2.5rem] border space-y-5 transition-colors`}>
-                                <h2 className="font-black text-xl uppercase text-alcans tracking-tight">Novo Afastamento</h2>
-                                <input type="text" placeholder="Nome do Colaborador" className={`w-full ${isDark ? 'bg-[#1a1a1a] border-white/10' : 'bg-gray-100 border-black/10'} p-4 rounded-2xl border outline-none focus:border-orange-500`} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                                <input type="text" placeholder="Cidade / Unidade" className={`w-full ${isDark ? 'bg-[#1a1a1a] border-white/10' : 'bg-gray-100 border-black/10'} p-4 rounded-2xl border outline-none focus:border-orange-500`} value={form.store} onChange={e => setForm({...form, store: e.target.value})} />
+                            <div className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-xl'} p-6 rounded-[2rem] border space-y-4`}>
+                                <h2 className="font-black text-center text-alcans uppercase tracking-tighter">Novo Registro</h2>
+                                <input type="text" placeholder="Nome do Colaborador" className={`w-full ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-black/10 text-black'} p-4 rounded-2xl border outline-none focus:border-orange-500`} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                                <input type="text" placeholder="Cidade / Unidade" className={`w-full ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-black/10 text-black'} p-4 rounded-2xl border outline-none focus:border-orange-500`} value={form.store} onChange={e => setForm({...form, store: e.target.value})} />
                                 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="text-left">
-                                        <label className="text-[10px] font-bold opacity-30 ml-2 uppercase">Data Início</label>
-                                        <input type="date" className={`w-full ${isDark ? 'bg-[#1a1a1a] border-white/10' : 'bg-gray-100 border-black/10'} p-4 rounded-2xl border outline-none mt-1`} value={form.start} onChange={e => setForm({...form, start: e.target.value})} />
-                                    </div>
-                                    <div className="text-left">
-                                        <label className="text-[10px] font-bold opacity-30 ml-2 uppercase">Data Fim</label>
-                                        <input type="date" className={`w-full ${isDark ? 'bg-[#1a1a1a] border-white/10' : 'bg-gray-100 border-black/10'} p-4 rounded-2xl border outline-none mt-1`} value={form.end} onChange={e => setForm({...form, end: e.target.value})} />
-                                    </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="date" className={`w-full ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-black/10 text-black'} p-4 rounded-2xl border outline-none text-xs`} value={form.start} onChange={e => setForm({...form, start: e.target.value})} />
+                                    <input type="date" className={`w-full ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-gray-50 border-black/10 text-black'} p-4 rounded-2xl border outline-none text-xs`} value={form.end} onChange={e => setForm({...form, end: e.target.value})} />
                                 </div>
 
-                                <div className={`${isDark ? 'bg-black/50 border-white/10' : 'bg-gray-50 border-black/10'} p-8 rounded-2xl border-2 border-dashed`}>
-                                    <input type="file" className="text-xs opacity-50" onChange={e => setForm({...form, file: e.target.files[0]})} />
+                                <div className={`${isDark ? 'bg-black/40 border-white/5' : 'bg-gray-100 border-black/5'} p-6 rounded-2xl border-2 border-dashed text-center`}>
+                                    <input type="file" className="text-[10px] opacity-60" onChange={e => setForm({...form, file: e.target.files[0]})} />
                                 </div>
 
-                                <button onClick={handleUpload} disabled={loading} className={`w-full ${loading ? 'bg-gray-600' : 'bg-alcans'} py-5 rounded-2xl font-black text-white uppercase tracking-widest transition shadow-xl`}>
-                                    {loading ? 'ENVIANDO...' : 'CONFIRMAR ENVIO'}
+                                <button onClick={handleUpload} disabled={loading} className="w-full bg-alcans py-4 rounded-2xl font-black text-white uppercase tracking-widest text-sm shadow-xl hover:brightness-110 transition">
+                                    {loading ? 'ENVIANDO...' : 'SALVAR NO SISTEMA'}
                                 </button>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                <input type="text" placeholder="Buscar por colaborador ou unidade..." className={`w-full ${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/10 shadow-sm'} p-5 rounded-[2rem] border outline-none focus:border-orange-500 transition mb-6`} onChange={e => setSearch(e.target.value)} />
+                            <div className="space-y-3">
+                                <input type="text" placeholder="Pesquisar..." className={`w-full ${isDark ? 'bg-[#111] border-white/5 text-white' : 'bg-white border-black/10 text-black shadow-sm'} p-4 rounded-2xl border outline-none focus:border-orange-500 mb-2`} onChange={e => setSearch(e.target.value)} />
                                 
                                 {files.filter(f => f.name.startsWith('V5-') && f.name.toLowerCase().includes(search.toLowerCase())).map(f => {
                                     const p = f.name.split('-');
                                     const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
                                     return (
-                                        <div key={f.id} className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-sm'} p-4 rounded-[2rem] border flex items-center gap-4 text-left transition-colors`}>
-                                            <img src={data.publicUrl} className="w-20 h-20 object-cover rounded-2xl bg-black cursor-pointer hover:scale-105 transition" onClick={() => window.open(data.publicUrl)} />
+                                        <div key={f.id} className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-sm'} p-3 rounded-2xl border flex items-center gap-3`}>
+                                            <img src={data.publicUrl} className="w-14 h-14 object-cover rounded-xl bg-black cursor-pointer shadow-md" onClick={() => window.open(data.publicUrl)} />
                                             <div className="flex-1 min-w-0">
-                                                <h3 className="font-black uppercase text-sm truncate">{p[3]?.replace(/_/g, ' ')}</h3>
-                                                <p className="text-[10px] font-bold opacity-40 uppercase">📍 {p[4]?.replace(/_/g, ' ')}</p>
-                                                <div className="mt-2 text-[10px] font-bold text-alcans bg-orange-500/10 inline-block px-2 py-1 rounded-md">
-                                                    🗓️ {p[1].split('-').reverse().join('/')} - {p[2].split('-').reverse().join('/')}
+                                                <h3 className="font-bold uppercase text-[11px] truncate">{p[3]?.replace(/_/g, ' ')}</h3>
+                                                <p className="text-[9px] font-bold opacity-40 uppercase">📍 {p[4]?.replace(/_/g, ' ')}</p>
+                                                <div className="mt-1 text-[8px] font-bold text-alcans bg-orange-500/5 px-2 py-0.5 rounded border border-orange-500/10 inline-block">
+                                                    {p[1].split('-').reverse().join('/')} ➔ {p[2].split('-').reverse().join('/')}
                                                 </div>
                                             </div>
-                                            <button onClick={async () => { if(confirm('Remover?')) { await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles(); } }} className="p-3 opacity-20 hover:opacity-100 transition text-red-500">🗑️</button>
+                                            <button onClick={async () => { if(confirm('Excluir?')) { await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles(); } }} className="p-2 opacity-20 hover:opacity-100 transition text-red-500 text-xs">🗑️</button>
                                         </div>
                                     );
                                 })}
