@@ -15,7 +15,6 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- CONFIGURAÇÃO SUPABASE ---
         const SUPABASE_URL = 'https://zxjegvonpiuyfplkonkb.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4amVndm9ucGl1eWZwbGtvbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4NDQwNjMsImV4cCI6MjA4MjQyMDA2M30.P-EkAuX1LiM5hybYYVaaUvMd04LgV7w0-GDkealXbwo';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -35,7 +34,6 @@
 
             async function fetchCertificates() {
                 setLoading(true);
-                // Conectando ao seu novo bucket 'atestados'
                 const { data, error } = await supabaseClient.storage.from('atestados').list('', { 
                     sortBy: { column: 'name', order: 'desc' } 
                 });
@@ -44,19 +42,28 @@
             }
 
             const handleUpload = async () => {
-                if (!formData.attendantName || !formData.file) return alert('Preencha o nome e escolha a foto!');
-                
+                if (!formData.attendantName || !formData.file) return alert('Preencha os dados!');
                 const fileName = `${Date.now()}_${formData.attendantName.replace(/\s/g, '_')}_${formData.store.replace(/\s/g, '_')}_${formData.file.name}`;
-                
                 const { error } = await supabaseClient.storage.from('atestados').upload(fileName, formData.file);
-
                 if (error) {
-                    alert('Erro ao subir: ' + error.message + '. Verifique se a Policy está como "true"!');
+                    alert('Erro: ' + error.message);
                 } else {
-                    alert('Atestado salvo na nuvem com sucesso!');
                     setFormData({ attendantName: '', store: '', file: null });
                     setShowForm(false);
                     fetchCertificates();
+                }
+            };
+
+            // NOVA FUNÇÃO: EXCLUIR DA NUVEM
+            const deleteCertificate = async (fileName) => {
+                if (window.confirm('Deseja realmente apagar este atestado da nuvem?')) {
+                    const { error } = await supabaseClient.storage.from('atestados').remove([fileName]);
+                    if (error) {
+                        alert('Erro ao apagar: ' + error.message);
+                    } else {
+                        alert('Removido com sucesso!');
+                        fetchCertificates(); // Atualiza a lista
+                    }
                 }
             };
 
@@ -69,60 +76,54 @@
                     <div className="max-w-4xl mx-auto">
                         <div className={`p-6 rounded-2xl shadow-xl mb-6 ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
                             <div className="flex justify-between items-center mb-6">
-                                <h1 className="text-2xl font-bold flex items-center gap-2">
-                                    <span className="text-indigo-500">📋</span> Controle de Atestados
-                                </h1>
+                                <h1 className="text-2xl font-bold">📋 Gestão de Atestados</h1>
                                 <div className="flex gap-2">
-                                    <button onClick={() => setDarkMode(!darkMode)} className="p-2 border rounded-lg bg-opacity-20 bg-gray-400 hover:bg-opacity-40 transition">
-                                        {darkMode ? '☀️ Modo Claro' : '🌙 Modo Escuro'}
+                                    <button onClick={() => setDarkMode(!darkMode)} className="p-2 border rounded-lg bg-opacity-20 bg-gray-400">
+                                        {darkMode ? '☀️' : '🌙'}
                                     </button>
-                                    <button onClick={() => setShowForm(!showForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
-                                        {showForm ? 'Fechar' : '+ Novo Atestado'}
+                                    <button onClick={() => setShowForm(!showForm)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg">
+                                        {showForm ? 'Fechar' : '+ Novo'}
                                     </button>
                                 </div>
                             </div>
 
                             {showForm && (
-                                <div className={`p-4 border rounded-xl mb-4 space-y-3 transition-all ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-indigo-50 border-indigo-100'}`}>
-                                    <input type="text" placeholder="Nome da Atendente" className="w-full p-2 border rounded text-black focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                <div className={`p-4 border rounded-xl mb-4 space-y-3 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-indigo-50 border-indigo-100'}`}>
+                                    <input type="text" placeholder="Nome" className="w-full p-2 border rounded text-black" 
                                         value={formData.attendantName} onChange={e => setFormData({...formData, attendantName: e.target.value})} />
-                                    <input type="text" placeholder="Loja (Opcional)" className="w-full p-2 border rounded text-black focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                    <input type="text" placeholder="Loja" className="w-full p-2 border rounded text-black" 
                                         value={formData.store} onChange={e => setFormData({...formData, store: e.target.value})} />
-                                    <input type="file" onChange={e => setFormData({...formData, file: e.target.files[0]})} className="w-full text-sm" />
-                                    <button onClick={handleUpload} className="w-full bg-green-600 text-white p-2 rounded-lg font-bold hover:bg-green-700 transition">
-                                        🚀 Salvar na Nuvem
-                                    </button>
+                                    <input type="file" onChange={e => setFormData({...formData, file: e.target.files[0]})} className="w-full" />
+                                    <button onClick={handleUpload} className="w-full bg-green-600 text-white p-2 rounded-lg font-bold">🚀 Enviar para Nuvem</button>
                                 </div>
                             )}
 
-                            <div className="relative">
-                                <span className="absolute left-3 top-3 opacity-50">🔍</span>
-                                <input type="text" placeholder="Buscar por nome ou loja..." className="w-full p-3 pl-10 border rounded-xl text-black focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                            </div>
+                            <input type="text" placeholder="🔍 Buscar por nome ou loja..." className="w-full p-3 border rounded-xl text-black"
+                                value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                         </div>
 
                         <div className="grid gap-4">
-                            {loading ? (
-                                <div className="text-center p-10 opacity-50 animate-pulse text-xl">Sincronizando com a nuvem...</div>
-                            ) : filteredCertificates.length === 0 ? (
-                                <div className="text-center p-10 opacity-50 border-2 border-dashed rounded-2xl">Nenhum atestado encontrado.</div>
-                            ) : filteredCertificates.map(cert => {
+                            {loading ? <p className="text-center opacity-50">Sincronizando...</p> : filteredCertificates.map(cert => {
                                 const { data } = supabaseClient.storage.from('atestados').getPublicUrl(cert.name);
                                 const partes = cert.name.split('_');
                                 return (
-                                    <div key={cert.id} className={`p-4 rounded-xl border-2 flex gap-4 items-center shadow-md hover:scale-[1.01] transition-transform ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
-                                        <img 
-                                            src={data.publicUrl} 
-                                            className="w-24 h-24 object-cover rounded-lg cursor-pointer border shadow-sm" 
-                                            onClick={() => window.open(data.publicUrl)} 
-                                            title="Clique para ampliar"
-                                        />
+                                    <div key={cert.id} className={`p-4 rounded-xl border-2 flex gap-4 items-center shadow-md ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'}`}>
+                                        <img src={data.publicUrl} className="w-20 h-20 object-cover rounded-lg cursor-pointer border" onClick={() => window.open(data.publicUrl)} />
                                         <div className="flex-1">
-                                            <p className="font-bold text-xl text-indigo-500">{partes[1] ? partes[1].replace(/_/g, ' ') : 'Atestado'}</p>
-                                            <p className="opacity-80 font-medium">Loja: {partes[2] ? partes[2].replace(/_/g, ' ') : '---'}</p>
-                                            <p className="text-xs opacity-50 mt-1">🕒 {new Date(parseInt(partes[0])).toLocaleString('pt-BR')}</p>
+                                            <p className="font-bold text-lg text-indigo-500">{partes[1] ? partes[1].replace(/_/g, ' ') : 'Arquivo'}</p>
+                                            <p className="text-sm opacity-80 font-medium">Loja: {partes[2] || '---'}</p>
+                                            <p className="text-xs opacity-50">{new Date(parseInt(partes[0])).toLocaleString('pt-BR')}</p>
                                         </div>
+                                        {/* BOTÃO EXCLUIR */}
+                                        <button 
+                                            onClick={() => deleteCertificate(cert.name)}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition"
+                                            title="Excluir"
+                                        >
+                                            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
                                     </div>
                                 );
                             })}
