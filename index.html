@@ -15,7 +15,6 @@
         .text-alcans { color: #FF5C00; }
         .bg-alcans { background-color: #FF5C00; }
         
-        /* Switch de Tema */
         .switch-container {
             width: 44px; height: 22px; background-color: #333; border-radius: 50px;
             position: relative; cursor: pointer; display: flex; align-items: center; padding: 0 3px;
@@ -27,11 +26,22 @@
         }
         .dark .switch-handle { transform: translateX(22px); }
         
-        /* Barra de Progresso Estilo Referência */
-        .progress-bg { height: 8px; border-radius: 10px; width: 100%; background: rgba(128,128,128,0.1); overflow: hidden; }
-        .progress-fill { height: 100%; background: #FF5C00; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); shadow: 0 0 10px rgba(255, 92, 0, 0.3); }
+        .progress-bg { height: 6px; border-radius: 10px; width: 100%; background: rgba(128,128,128,0.1); overflow: hidden; }
+        .progress-fill { height: 100%; background: #FF5C00; transition: width 0.5s ease; }
         
-        .dark input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.5; }
+        .month-divider {
+            position: relative; text-align: center; margin: 2rem 0 1rem;
+        }
+        .month-divider::before {
+            content: ""; position: absolute; left: 0; top: 50%; width: 100%; height: 1px;
+            background: rgba(128,128,128,0.2); z-index: 1;
+        }
+        .month-label {
+            position: relative; z-index: 2; padding: 0 15px; font-weight: 900;
+            text-transform: uppercase; font-size: 11px; letter-spacing: 0.1em;
+        }
+        .dark .month-label { background: #000; color: #FF5C00; }
+        .light .month-label { background: #f9fafb; color: #FF5C00; }
     </style>
 </head>
 <body class="bg-black text-white">
@@ -69,6 +79,7 @@
             };
 
             const updateStep = async (file, newStep) => {
+                if (newStep < 1 || newStep > 4) return;
                 const oldName = file.name;
                 const newName = oldName.replace(/ST\d/, `ST${newStep}`);
                 const { error } = await supabaseClient.storage.from('atestados').copy(oldName, newName);
@@ -82,11 +93,30 @@
                 if (!form.file || !form.name) return alert("Preencha os campos!");
                 setLoading(true);
                 const clean = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_");
-                const fileName = `V5-ST1-${form.start || '00-00'}-${form.end || '00-00'}-${clean(form.name)}-${clean(form.store || 'Alcans')}-${Date.now()}.${form.file.name.split('.').pop()}`;
+                const fileName = `V5-ST1-${form.start || '0000-00-00'}-${form.end || '0000-00-00'}-${clean(form.name)}-${clean(form.store || 'Alcans')}-${Date.now()}.${form.file.name.split('.').pop()}`;
                 const { error } = await supabaseClient.storage.from('atestados').upload(fileName, form.file);
                 if (!error) { setForm({ name: '', store: '', start: '', end: '', file: null }); setView('list'); loadFiles(); }
                 setLoading(false);
             };
+
+            // Função para agrupar por mês
+            const groupFilesByMonth = (filesList) => {
+                const filtered = filesList.filter(f => f.name.startsWith('V5-') && f.name.toLowerCase().includes(search.toLowerCase()));
+                const groups = {};
+                
+                filtered.forEach(f => {
+                    const parts = f.name.split('-');
+                    const dateStr = parts[2]; // yyyy-mm-dd
+                    const date = new Date(dateStr + 'T12:00:00');
+                    const monthYear = date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+                    
+                    if (!groups[monthYear]) groups[monthYear] = [];
+                    groups[monthYear].push(f);
+                });
+                return groups;
+            };
+
+            const groupedFiles = groupFilesByMonth(files);
 
             return (
                 <div className="min-h-screen flex flex-col items-center p-4">
@@ -105,7 +135,7 @@
                         </div>
                     </header>
 
-                    <main className="w-full max-w-3xl">
+                    <main className="w-full max-w-2xl">
                         {view === 'add' ? (
                             <div className={`max-w-md mx-auto ${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-xl'} p-8 rounded-[2.5rem] border space-y-4`}>
                                 <input type="text" placeholder="Nome do Colaborador" className={`w-full ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-black/10'} p-4 rounded-2xl border outline-none focus:border-orange-500`} value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
@@ -120,67 +150,67 @@
                                 <button onClick={handleUpload} className="w-full bg-alcans py-4 rounded-2xl font-black text-white uppercase tracking-widest text-sm shadow-xl">ENVIAR</button>
                             </div>
                         ) : (
-                            <div className="space-y-4">
-                                <input type="text" placeholder="Pesquisar registros..." className={`w-full ${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/10 shadow-sm'} p-4 rounded-2xl border outline-none focus:border-orange-500 mb-4`} onChange={e => setSearch(e.target.value)} />
+                            <div className="space-y-2">
+                                <input type="text" placeholder="Pesquisar registros..." className={`w-full ${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/10 shadow-sm'} p-4 rounded-2xl border outline-none focus:border-orange-500 mb-6`} onChange={e => setSearch(e.target.value)} />
                                 
-                                {files.filter(f => f.name.startsWith('V5-') && f.name.toLowerCase().includes(search.toLowerCase())).map(f => {
-                                    const p = f.name.split('-');
-                                    const step = parseInt(p[1].replace('ST', ''));
-                                    const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
-                                    const percent = (step / 4) * 100;
+                                {Object.keys(groupedFiles).length === 0 && <p className="text-center opacity-30 py-10 text-xs uppercase font-bold">Nenhum registro encontrado</p>}
 
-                                    return (
-                                        <div key={f.id} className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-md'} p-4 rounded-[1.5rem] border relative overflow-hidden`}>
-                                            <div className="flex gap-4 items-start">
-                                                {/* Miniatura à esquerda */}
-                                                <img src={data.publicUrl} className="w-24 h-24 object-cover rounded-xl bg-black cursor-pointer flex-shrink-0" onClick={() => window.open(data.publicUrl)} />
-                                                
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <h3 className="font-black uppercase text-sm flex items-center gap-2">
-                                                                <span className="text-alcans">👤</span> {p[4]?.replace(/_/g, ' ')}
-                                                            </h3>
-                                                            <div className="flex gap-4 mt-1 opacity-60 text-[10px] font-bold uppercase">
-                                                                <span>🏢 {p[5]?.replace(/_/g, ' ')}</span>
-                                                                <span>📅 {p[2].split('-').reverse().join('/')}</span>
+                                {Object.keys(groupedFiles).map(month => (
+                                    <div key={month} className="mb-8">
+                                        <div className="month-divider">
+                                            <span className="month-label">{month}</span>
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                            {groupedFiles[month].map(f => {
+                                                const p = f.name.split('-');
+                                                const step = parseInt(p[1].replace('ST', ''));
+                                                const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
+                                                const percent = (step / 4) * 100;
+
+                                                return (
+                                                    <div key={f.id} className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-md'} p-4 rounded-[1.5rem] border relative`}>
+                                                        <div className="flex gap-4">
+                                                            <img src={data.publicUrl} className="w-20 h-20 object-cover rounded-xl bg-black cursor-pointer flex-shrink-0" onClick={() => window.open(data.publicUrl)} />
+                                                            
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between">
+                                                                    <div>
+                                                                        <h3 className="font-black uppercase text-xs flex items-center gap-2">
+                                                                            <span className="text-alcans">👤</span> {p[4]?.replace(/_/g, ' ')}
+                                                                        </h3>
+                                                                        <p className="text-[10px] font-bold opacity-40 uppercase mt-0.5">🏢 {p[5]?.replace(/_/g, ' ')} • 📅 {p[2].split('-').reverse().join('/')}</p>
+                                                                    </div>
+                                                                    <button onClick={async () => { if(confirm('Remover?')) { await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles(); } }} className="text-red-500 opacity-30 hover:opacity-100 text-sm">✕</button>
+                                                                </div>
+
+                                                                <div className="mt-3 mb-3">
+                                                                    <div className="flex justify-between items-center mb-1 text-[9px] font-black uppercase opacity-40">
+                                                                        <span>Progresso</span>
+                                                                        <span className="text-alcans">{percent}%</span>
+                                                                    </div>
+                                                                    <div className="progress-bg"><div className="progress-fill" style={{ width: `${percent}%` }}></div></div>
+                                                                </div>
+
+                                                                <div className="flex justify-between items-center gap-2">
+                                                                    <div className="flex gap-1 overflow-hidden">
+                                                                        {STEPS.map(s => (
+                                                                            <div key={s.id} title={s.label} className={`w-2 h-2 rounded-full ${step >= s.id ? 'bg-alcans' : 'bg-gray-500/20'}`}></div>
+                                                                        ))}
+                                                                    </div>
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={() => updateStep(f, step - 1)} disabled={step === 1} className="bg-gray-500/10 hover:bg-gray-500/20 text-[9px] px-3 py-1.5 rounded-lg font-black uppercase disabled:opacity-0 transition">Retornar</button>
+                                                                        <button onClick={() => updateStep(f, step + 1)} disabled={step === 4} className="bg-alcans text-white text-[9px] px-3 py-1.5 rounded-lg font-black uppercase disabled:opacity-0 transition">Avançar</button>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <button onClick={async () => { if(confirm('Remover?')) { await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles(); } }} className="text-red-500 opacity-40 hover:opacity-100 transition text-lg leading-none">✕</button>
                                                     </div>
-
-                                                    {/* Barra de Progresso com Porcentagem */}
-                                                    <div className="mt-4 mb-4">
-                                                        <div className="flex justify-between items-center mb-1">
-                                                            <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Progresso</span>
-                                                            <span className="text-[10px] font-black text-alcans">{percent}%</span>
-                                                        </div>
-                                                        <div className="progress-bg">
-                                                            <div className="progress-fill" style={{ width: `${percent}%` }}></div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Botões de Etapa Estilo Referência */}
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                                        {STEPS.map(s => (
-                                                            <button 
-                                                                key={s.id}
-                                                                onClick={() => updateStep(f, s.id)}
-                                                                className={`py-2 px-1 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center justify-center gap-1 transition-all border ${
-                                                                    step >= s.id 
-                                                                    ? 'bg-alcans text-white border-alcans shadow-lg shadow-orange-600/20' 
-                                                                    : 'bg-transparent border-white/10 opacity-30'
-                                                                }`}
-                                                            >
-                                                                {step >= s.id && <span>✓</span>} {s.label}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                );
+                                            })}
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </main>
