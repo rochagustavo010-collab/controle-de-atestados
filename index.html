@@ -14,17 +14,15 @@
         body { font-family: 'Inter', sans-serif; transition: background-color 0.3s; margin: 0; }
         .text-alcans { color: #FF5C00; }
         .bg-alcans { background-color: #FF5C00; }
-        .switch-container { width: 44px; height: 22px; background-color: #333; border-radius: 50px; position: relative; cursor: pointer; display: flex; align-items: center; padding: 0 3px; }
-        .light .switch-container { background-color: #ccc; }
-        .switch-handle { width: 16px; height: 16px; background-color: white; border-radius: 50%; transition: transform 0.3s; display: flex; align-items: center; justify-content: center; font-size: 9px; }
-        .dark .switch-handle { transform: translateX(22px); }
         .progress-bg { height: 6px; border-radius: 10px; width: 100%; background: rgba(128,128,128,0.1); overflow: hidden; }
         .progress-fill { height: 100%; background: #FF5C00; transition: width 0.5s ease; }
         .month-divider { position: relative; text-align: center; margin: 2rem 0 1rem; }
         .month-divider::before { content: ""; position: absolute; left: 0; top: 50%; width: 100%; height: 1px; background: rgba(128,128,128,0.2); z-index: 1; }
-        .month-label { position: relative; z-index: 2; padding: 0 15px; font-weight: 900; text-transform: uppercase; font-size: 11px; letter-spacing: 0.1em; }
-        .dark .month-label { background: #000; color: #FF5C00; }
-        .light .month-label { background: #f9fafb; color: #FF5C00; }
+        .month-label { position: relative; z-index: 2; padding: 0 15px; font-weight: 900; text-transform: uppercase; font-size: 11px; letter-spacing: 0.1em; background: inherit; color: #FF5C00; }
+        .switch-container { width: 44px; height: 22px; background-color: #333; border-radius: 50px; position: relative; cursor: pointer; display: flex; align-items: center; padding: 0 3px; }
+        .light .switch-container { background-color: #ccc; }
+        .switch-handle { width: 16px; height: 16px; background-color: white; border-radius: 50%; transition: transform 0.3s; display: flex; align-items: center; justify-content: center; font-size: 9px; }
+        .dark .switch-handle { transform: translateX(22px); }
     </style>
 </head>
 <body class="bg-black text-white">
@@ -58,65 +56,75 @@
 
             const loadFiles = async () => {
                 const { data } = await supabaseClient.storage.from('atestados').list('', { sortBy: { column: 'name', order: 'desc' } });
-                if (data) setFiles(data);
+                if (data) setFiles(data.filter(f => f.name.startsWith('V5-')));
             };
 
-            const clean = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_");
+            const clean = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_") : "S_N";
 
-            const handleEdit = async (file) => {
-                const p = file.name.split('-');
-                if(p.length < 6) return alert("Erro no formato do nome do arquivo.");
+            const handleUpdateFileName = async (oldName, newAttributes) => {
+                setLoading(true);
+                try {
+                    const p = oldName.split('-');
+                    // Preservar valores antigos se os novos não forem passados
+                    const step = newAttributes.step || p[1];
+                    const start = newAttributes.start || p[2];
+                    const end = newAttributes.end || p[3];
+                    const name = clean(newAttributes.name) || p[4];
+                    const store = clean(newAttributes.store) || p[5];
+                    const suffix = p[6]; // Mantém ID e Extensão (Ex: 173541234.jpg)
 
-                const newName = prompt("Editar Nome do Colaborador:", p[4].replace(/_/g, ' '));
-                const newStore = prompt("Editar Cidade / Unidade:", p[5].replace(/_/g, ' '));
-                const newStart = prompt("Editar Data Início (AAAA-MM-DD):", p[2]);
-                const newEnd = prompt("Editar Data Fim (AAAA-MM-DD):", p[3]);
+                    const newName = `V5-${step}-${start}-${end}-${name}-${store}-${suffix}`;
 
-                if (newName && newStore && newStart && newEnd) {
-                    // p[6] já contém o timestamp e a extensão original (ex: 1735412345.jpg)
-                    const updatedFileName = `${p[0]}-${p[1]}-${newStart}-${newEnd}-${clean(newName)}-${clean(newStore)}-${p[6]}`;
-                    
-                    setLoading(true);
-                    const { error: copyError } = await supabaseClient.storage.from('atestados').copy(file.name, updatedFileName);
-                    
-                    if (!copyError) {
-                        await supabaseClient.storage.from('atestados').remove([file.name]);
-                        await loadFiles();
-                    } else {
-                        alert("Erro ao editar: " + copyError.message);
-                    }
+                    const { error: copyError } = await supabaseClient.storage.from('atestados').copy(oldName, newName);
+                    if (copyError) throw copyError;
+
+                    await supabaseClient.storage.from('atestados').remove([oldName]);
+                    await loadFiles();
+                } catch (err) {
+                    alert("Erro na operação: " + err.message);
+                } finally {
                     setLoading(false);
                 }
             };
 
-            const updateStep = async (file, newStep) => {
-                if (newStep < 1 || newStep > 4) return;
-                const oldName = file.name;
-                const newName = oldName.replace(/ST\d/, `ST${newStep}`);
-                const { error } = await supabaseClient.storage.from('atestados').copy(oldName, newName);
-                if (!error) {
-                    await supabaseClient.storage.from('atestados').remove([oldName]);
-                    await loadFiles();
-                }
+            const handleEdit = (file) => {
+                const p = file.name.split('-');
+                const nName = prompt("Nome do Colaborador:", p[4].replace(/_/g, ' '));
+                if (nName === null) return;
+                const nStore = prompt("Cidade/Unidade:", p[5].replace(/_/g, ' '));
+                if (nStore === null) return;
+                const nStart = prompt("Data Início (AAAA-MM-DD):", p[2]);
+                if (nStart === null) return;
+                const nEnd = prompt("Data Fim (AAAA-MM-DD):", p[3]);
+                if (nEnd === null) return;
+
+                handleUpdateFileName(file.name, { name: nName, store: nStore, start: nStart, end: nEnd });
             };
 
             const handleUpload = async () => {
                 if (!form.file || !form.name) return alert("Preencha os campos!");
                 setLoading(true);
                 const ext = form.file.name.split('.').pop();
-                const fileName = `V5-ST1-${form.start || '0000-00-00'}-${form.end || '0000-00-00'}-${clean(form.name)}-${clean(form.store || 'Alcans')}-${Date.now()}.${ext}`;
+                const fileName = `V5-ST1-${form.start || '0000-00-00'}-${form.end || '0000-00-00'}-${clean(form.name)}-${clean(form.store)}-${Date.now()}.${ext}`;
+                
                 const { error } = await supabaseClient.storage.from('atestados').upload(fileName, form.file);
-                if (!error) { setForm({ name: '', store: '', start: '', end: '', file: null }); setView('list'); loadFiles(); }
+                if (!error) {
+                    setForm({ name: '', store: '', start: '', end: '', file: null });
+                    setView('list');
+                    await loadFiles();
+                } else {
+                    alert("Erro no upload: " + error.message);
+                }
                 setLoading(false);
             };
 
             const groupFilesByMonth = (filesList) => {
-                const filtered = filesList.filter(f => f.name.startsWith('V5-') && f.name.toLowerCase().includes(search.toLowerCase()));
+                const filtered = filesList.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
                 const groups = {};
                 filtered.forEach(f => {
                     const parts = f.name.split('-');
                     const date = new Date(parts[2] + 'T12:00:00');
-                    const monthYear = isNaN(date.getTime()) ? "Sem Data" : date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+                    const monthYear = isNaN(date.getTime()) ? "Outros/Sem Data" : date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
                     if (!groups[monthYear]) groups[monthYear] = [];
                     groups[monthYear].push(f);
                 });
@@ -127,9 +135,10 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center p-4">
-                    {loading && <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center font-bold">CARREGANDO...</div>}
+                    {loading && <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center font-black text-alcans animate-pulse">PROCESSANDO...</div>}
+                    
                     <header className="w-full max-w-2xl flex justify-between items-center py-6 mb-2">
-                        <div>
+                        <div className="flex flex-col">
                             <h1 className="text-2xl font-black italic text-alcans tracking-tighter leading-none">ALCANS</h1>
                             <p className="text-[9px] uppercase tracking-[0.2em] font-bold mt-1 opacity-50">Registros de Atestados</p>
                         </div>
@@ -148,18 +157,19 @@
                             <div className={`max-w-md mx-auto ${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-xl'} p-8 rounded-[2.5rem] border space-y-4`}>
                                 <input type="text" placeholder="Nome do Colaborador" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
                                 <input type="text" placeholder="Cidade / Unidade" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" value={form.store} onChange={e => setForm({...form, store: e.target.value})} />
-                                <div className="grid grid-cols-2 gap-4">
-                                    <input type="date" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-xs" value={form.start} onChange={e => setForm({...form, start: e.target.value})} />
-                                    <input type="date" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none text-xs" value={form.end} onChange={e => setForm({...form, end: e.target.value})} />
+                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                    <input type="date" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" value={form.start} onChange={e => setForm({...form, start: e.target.value})} />
+                                    <input type="date" className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" value={form.end} onChange={e => setForm({...form, end: e.target.value})} />
                                 </div>
                                 <div className="border-2 border-dashed border-white/10 p-6 rounded-2xl text-center">
                                     <input type="file" className="text-xs opacity-50" onChange={e => setForm({...form, file: e.target.files[0]})} />
                                 </div>
-                                <button onClick={handleUpload} className="w-full bg-alcans py-4 rounded-2xl font-black text-white uppercase tracking-widest text-sm">ENVIAR</button>
+                                <button onClick={handleUpload} className="w-full bg-alcans py-4 rounded-2xl font-black text-white uppercase tracking-widest text-sm">SALVAR</button>
                             </div>
                         ) : (
                             <div className="space-y-2">
                                 <input type="text" placeholder="Pesquisar..." className={`w-full ${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/10 shadow-sm'} p-4 rounded-2xl border outline-none mb-6`} onChange={e => setSearch(e.target.value)} />
+                                
                                 {Object.keys(groupedFiles).map(month => (
                                     <div key={month} className="mb-8">
                                         <div className="month-divider"><span className="month-label">{month}</span></div>
@@ -168,33 +178,32 @@
                                                 const p = f.name.split('-');
                                                 const step = parseInt(p[1]?.replace('ST', '') || '1');
                                                 const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
-                                                const percent = (step / 4) * 100;
                                                 return (
                                                     <div key={f.id} className={`${isDark ? 'bg-[#111] border-white/5' : 'bg-white border-black/5 shadow-md'} p-4 rounded-[1.5rem] border relative`}>
                                                         <div className="flex gap-4">
                                                             <img src={data.publicUrl} className="w-20 h-20 object-cover rounded-xl bg-black cursor-pointer shadow-md" onClick={() => window.open(data.publicUrl)} />
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="flex justify-between items-start">
-                                                                    <div className="flex-1">
-                                                                        <h3 className="font-black uppercase text-xs truncate">👤 {p[4]?.replace(/_/g, ' ') || 'S/ NOME'}</h3>
-                                                                        <p className="text-[10px] font-bold opacity-40 uppercase truncate">🏢 {p[5]?.replace(/_/g, ' ') || 'S/ LOJA'} • 📅 {p[2]?.split('-').reverse().join('/')}</p>
+                                                                    <div className="flex-1 truncate mr-2">
+                                                                        <h3 className="font-black uppercase text-[11px] truncate">👤 {p[4]?.replace(/_/g, ' ') || 'S/ NOME'}</h3>
+                                                                        <p className="text-[9px] font-bold opacity-40 uppercase truncate">🏢 {p[5]?.replace(/_/g, ' ') || 'S/ LOJA'} • 📅 {p[2]?.split('-').reverse().join('/')}</p>
                                                                     </div>
-                                                                    <div className="flex gap-3 items-center ml-2">
-                                                                        <button onClick={() => handleEdit(f)} title="Editar" className="text-alcans opacity-40 hover:opacity-100 transition">
-                                                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                                    <div className="flex gap-3 items-center">
+                                                                        <button onClick={() => handleEdit(f)} className="text-alcans opacity-40 hover:opacity-100 transition">
+                                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                                                         </button>
-                                                                        <button onClick={async () => { if(confirm('Remover?')) { await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles(); } }} className="text-red-500 opacity-30 hover:opacity-100">✕</button>
+                                                                        <button onClick={async () => { if(confirm('Remover?')) { setLoading(true); await supabaseClient.storage.from('atestados').remove([f.name]); await loadFiles(); setLoading(false); } }} className="text-red-500 opacity-30 hover:opacity-100">✕</button>
                                                                     </div>
                                                                 </div>
                                                                 <div className="mt-3 mb-3">
-                                                                    <div className="flex justify-between items-center mb-1 text-[9px] font-black uppercase opacity-40"><span>Progresso</span><span className="text-alcans">{percent}%</span></div>
-                                                                    <div className="progress-bg"><div className="progress-fill" style={{ width: `${percent}%` }}></div></div>
+                                                                    <div className="flex justify-between items-center mb-1 text-[8px] font-black uppercase opacity-40"><span>Progresso</span><span className="text-alcans">{(step/4)*100}%</span></div>
+                                                                    <div className="progress-bg"><div className="progress-fill" style={{ width: `${(step/4)*100}%` }}></div></div>
                                                                 </div>
                                                                 <div className="flex justify-between items-center">
-                                                                    <div className="flex gap-1">{STEPS.map(s => (<div key={s.id} className={`w-2 h-2 rounded-full ${step >= s.id ? 'bg-alcans' : 'bg-gray-500/20'}`}></div>))}</div>
+                                                                    <div className="flex gap-1">{STEPS.map(s => (<div key={s.id} className={`w-1.5 h-1.5 rounded-full ${step >= s.id ? 'bg-alcans' : 'bg-gray-500/20'}`}></div>))}</div>
                                                                     <div className="flex gap-2">
-                                                                        <button onClick={() => updateStep(f, step - 1)} disabled={step === 1} className="bg-gray-500/10 text-[9px] px-3 py-1.5 rounded-lg font-black uppercase disabled:opacity-0">Retornar</button>
-                                                                        <button onClick={() => updateStep(f, step + 1)} disabled={step === 4} className="bg-alcans text-white text-[9px] px-3 py-1.5 rounded-lg font-black uppercase disabled:opacity-0">Avançar</button>
+                                                                        <button onClick={() => handleUpdateFileName(f.name, { step: `ST${step-1}` })} disabled={step === 1} className="bg-gray-500/10 text-[8px] px-2 py-1 rounded font-black uppercase disabled:opacity-0 transition">Retornar</button>
+                                                                        <button onClick={() => handleUpdateFileName(f.name, { step: `ST${step+1}` })} disabled={step === 4} className="bg-alcans text-white text-[8px] px-2 py-1 rounded font-black uppercase disabled:opacity-0 transition">Avançar</button>
                                                                     </div>
                                                                 </div>
                                                             </div>
