@@ -11,14 +11,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; margin: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f1a; color: #fff; margin: 0; }
         .text-alcans { color: #FF5C00; }
         .bg-alcans { background-color: #FF5C00; }
-        .card-atestado { background: #111; border: 1px solid rgba(255,255,255,0.05); border-radius: 1.5rem; padding: 1.5rem; }
-        .progress-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1); flex: 1; position: relative; }
-        .progress-fill { height: 100%; background: #FF5C00; border-radius: 2px; transition: width 0.3s; }
-        .btn-step { font-size: 9px; font-weight: 900; padding: 8px 12px; border-radius: 8px; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.1); transition: all 0.2s; }
-        .btn-step.active { background: #FF5C00; border-color: #FF5C00; color: #fff; box-shadow: 0 0 15px rgba(255,92,0,0.3); }
+        .card-atestado { border-radius: 1.2rem; padding: 1.2rem; margin-bottom: 1rem; position: relative; color: #1e293b; }
+        .status-25 { background-color: #c4d4e3; }
+        .status-50 { background-color: #f3efb5; }
+        .status-75 { background-color: #f3efb5; }
+        .status-100 { background-color: #c6e3d0; }
+        .progress-track { height: 8px; background: rgba(0,0,0,0.1); border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { height: 100%; background: #4f46e5; transition: width 0.5s ease; }
     </style>
 </head>
 <body>
@@ -30,148 +32,98 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4amVndm9ucGl1eWZwbGtvbmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4NDQwNjMsImV4cCI6MjA4MjQyMDA2M30.P-EkAuX1LiM5hybYYVaaUvMd04LgV7w0-GDkealXbwo';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const STEPS = [
-            { id: 1, label: "Recebido Foto", key: "ST1" },
-            { id: 2, label: "Subiu Form", key: "ST2" },
-            { id: 3, label: "Físico", key: "ST3" },
-            { id: 4, label: "Entregue DP", key: "ST4" }
-        ];
-
         const App = () => {
-            const [view, setView] = useState('list');
             const [files, setFiles] = useState([]);
-            const [search, setSearch] = useState('');
             const [loading, setLoading] = useState(false);
-            const [form, setForm] = useState({ name: '', store: '', start: '', end: '', file: null });
 
             useEffect(() => { loadFiles(); }, []);
 
             const loadFiles = async () => {
-                const { data } = await supabaseClient.storage.from('atestados').list('', { sortBy: { column: 'name', order: 'desc' } });
+                const { data } = await supabaseClient.storage.from('atestados').list();
                 if (data) setFiles(data);
             };
 
-            const clean = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_") : "DOC";
-
-            const handleAction = async (file, actionType, payload = {}) => {
+            const forceDelete = async (name) => {
+                if(!confirm("Deseja forçar a exclusão deste arquivo?")) return;
                 setLoading(true);
-                try {
-                    if (actionType === 'delete') {
-                        await supabaseClient.storage.from('atestados').remove([file.name]);
-                    } else if (actionType === 'update') {
-                        const p = file.name.split('-');
-                        const step = payload.step || p[1] || 'ST1';
-                        const start = payload.start || p[2] || '0000-00-00';
-                        const end = payload.end || p[3] || '0000-00-00';
-                        const name = clean(payload.name || p[4] || 'S_NOME');
-                        const store = clean(payload.store || p[5] || 'S_LOJA');
-                        const suffix = p[6] || `${Date.now()}.jpg`;
+                
+                // Tentativa 1: Nome direto
+                let { error } = await supabaseClient.storage.from('atestados').remove([name]);
+                
+                // Tentativa 2: Se falhar, tenta limpar caracteres especiais (fallback)
+                if (error) {
+                    const decodedName = decodeURIComponent(name);
+                    const { error: error2 } = await supabaseClient.storage.from('atestados').remove([decodedName]);
+                    if (error2) alert("Erro persistente: " + error2.message);
+                }
 
-                        const newName = `V5-${step}-${start}-${end}-${name}-${store}-${suffix}`;
-                        const { error: copyError } = await supabaseClient.storage.from('atestados').copy(file.name, newName);
-                        if (!copyError) await supabaseClient.storage.from('atestados').remove([file.name]);
-                    }
-                    await loadFiles();
-                } catch (e) { alert("Erro na operação"); }
-                setLoading(false);
-            };
-
-            const handleUpload = async () => {
-                if (!form.file || !form.name) return alert("Preencha os campos!");
-                setLoading(true);
-                const ext = form.file.name.split('.').pop();
-                const fileName = `V5-ST1-${form.start || '0000-00-00'}-${form.end || '0000-00-00'}-${clean(form.name)}-${clean(form.store)}-${Date.now()}.${ext}`;
-                await supabaseClient.storage.from('atestados').upload(fileName, form.file);
-                setView('list');
                 await loadFiles();
                 setLoading(false);
             };
 
+            const cleanOldFiles = async () => {
+                if(!confirm("Isso removerá apenas arquivos com erro. Continuar?")) return;
+                setLoading(true);
+                const toDelete = files.filter(f => !f.name.startsWith('V5-')).map(f => f.name);
+                if(toDelete.length > 0) {
+                    await supabaseClient.storage.from('atestados').remove(toDelete);
+                }
+                await loadFiles();
+                setLoading(false);
+            };
+
+            const getInfo = (name) => {
+                const p = name.split('-');
+                if (name.includes('ST4')) return { p: 100, c: 'status-100' };
+                if (name.includes('ST3')) return { p: 75, c: 'status-75' };
+                if (name.includes('ST2')) return { p: 50, c: 'status-50' };
+                return { p: 25, c: 'status-25' };
+            };
+
             return (
                 <div className="min-h-screen p-4 max-w-2xl mx-auto">
-                    {loading && <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center font-black text-alcans tracking-widest">PROCESSANDO...</div>}
+                    {loading && <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center font-black text-alcans">LIMPANDO ARQUIVO...</div>}
                     
-                    <header className="flex justify-between items-center py-8">
-                        <div>
-                            <h1 className="text-3xl font-black italic text-alcans leading-none">ALCANS</h1>
-                            <p className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Gestão de Atestados</p>
-                        </div>
-                        <button onClick={() => setView(view === 'list' ? 'add' : 'list')} className="bg-alcans text-white px-6 py-3 rounded-full font-black text-[11px] tracking-tighter">
-                            {view === 'list' ? '+ NOVO REGISTRO' : 'VOLTAR'}
+                    <header className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-black text-alcans italic leading-none">ALCANS</h1>
+                        <button onClick={cleanOldFiles} className="text-[10px] bg-red-600/20 text-red-500 px-3 py-1 rounded border border-red-500/30 font-bold uppercase">
+                            Limpar Arquivos com Erro
                         </button>
                     </header>
 
-                    {view === 'add' ? (
-                        <div className="card-atestado space-y-4">
-                            <input type="text" placeholder="Nome do Colaborador" className="w-full bg-white/5 p-4 rounded-xl outline-none border border-white/10" onChange={e => setForm({...form, name: e.target.value})} />
-                            <input type="text" placeholder="Cidade/Unidade" className="w-full bg-white/5 p-4 rounded-xl outline-none border border-white/10" onChange={e => setForm({...form, store: e.target.value})} />
-                            <div className="grid grid-cols-2 gap-4">
-                                <input type="date" className="bg-white/5 p-4 rounded-xl text-xs border border-white/10" onChange={e => setForm({...form, start: e.target.value})} />
-                                <input type="date" className="bg-white/5 p-4 rounded-xl text-xs border border-white/10" onChange={e => setForm({...form, end: e.target.value})} />
-                            </div>
-                            <input type="file" className="text-xs opacity-50 block w-full" onChange={e => setForm({...form, file: e.target.files[0]})} />
-                            <button onClick={handleUpload} className="w-full bg-alcans py-4 rounded-xl font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-600/20">Confirmar Envio</button>
-                        </div>
-                    ) : (
-                        <div className="space-y-6">
-                            <input type="text" placeholder="Pesquisar registros..." className="w-full bg-[#111] p-5 rounded-2xl outline-none border border-white/5" onChange={e => setSearch(e.target.value)} />
-                            
-                            {files.filter(f => f.name.toLowerCase().includes(search.toLowerCase())).map(f => {
-                                const p = f.name.split('-');
-                                const currentStep = parseInt(p[1]?.replace('ST', '') || '1');
-                                const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
-                                
-                                return (
-                                    <div key={f.id} className="card-atestado relative overflow-hidden">
-                                        <div className="flex gap-5 items-start mb-6">
-                                            <img src={data.publicUrl} className="w-20 h-20 object-cover rounded-2xl bg-black border border-white/10 cursor-pointer" onClick={() => window.open(data.publicUrl)} />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <h3 className="font-black text-sm uppercase truncate text-white">{p[4]?.replace(/_/g, ' ') || 'S/ NOME'}</h3>
-                                                        <p className="text-[10px] font-bold text-alcans opacity-80 uppercase tracking-tighter">🏢 {p[5]?.replace(/_/g, ' ') || 'S/ UNIDADE'}</p>
-                                                        <p className="text-[9px] font-medium opacity-40 mt-1">📅 Início: {p[2]?.split('-').reverse().join('/') || '--/--/----'}</p>
-                                                    </div>
-                                                    <div className="flex gap-3">
-                                                        <button onClick={() => {
-                                                            const nName = prompt("Novo Nome:", p[4].replace(/_/g, ' '));
-                                                            if(nName) handleAction(f, 'update', { name: nName });
-                                                        }} className="opacity-20 hover:opacity-100 text-alcans">✎</button>
-                                                        <button onClick={() => { if(confirm('Remover registro?')) handleAction(f, 'delete'); }} className="opacity-20 hover:opacity-100 text-red-500 font-bold text-lg">✕</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                    <div className="space-y-4">
+                        {files.map(f => {
+                            const info = getInfo(f.name);
+                            const p = f.name.split('-');
+                            const isV5 = f.name.startsWith('V5-');
+                            const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
 
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest opacity-40">
-                                                <span>Progresso do Atestado</span>
-                                                <span className="text-alcans">{(currentStep/4)*100}%</span>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {[1,2,3,4].map(s => (
-                                                    <div key={s} className="progress-bar">
-                                                        <div className="progress-fill" style={{ width: currentStep >= s ? '100%' : '0%' }}></div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="grid grid-cols-4 gap-2">
-                                                {STEPS.map(s => (
-                                                    <button 
-                                                        key={s.id} 
-                                                        onClick={() => handleAction(f, 'update', { step: s.key })}
-                                                        className={`btn-step ${currentStep >= s.id ? 'active' : 'opacity-20'}`}
-                                                    >
-                                                        {s.label}
-                                                    </button>
-                                                ))}
-                                            </div>
+                            return (
+                                <div key={f.name} className={`card-atestado ${info.c}`}>
+                                    <button onClick={() => forceDelete(f.name)} className="absolute top-4 right-4 text-red-600 font-bold text-xl hover:scale-125 transition">✕</button>
+                                    
+                                    <div className="flex gap-4 items-center">
+                                        <img src={data.publicUrl} className="w-16 h-16 rounded-xl bg-black/10 object-cover" onError={e => e.target.src='https://via.placeholder.com/64?text=?'} />
+                                        <div className="flex-1">
+                                            <h2 className="font-black text-sm uppercase truncate pr-6">
+                                                {!isV5 ? "⚠️ ARQUIVO TRAVADO" : (p[4]?.replace(/_/g, ' ') || 'S/ NOME')}
+                                            </h2>
+                                            <p className="text-[10px] font-bold opacity-60 uppercase truncate">
+                                                {isV5 ? (p[5]?.replace(/_/g, ' ') || 'S/ UNIDADE') : f.name}
+                                            </p>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
+
+                                    <div className="progress-track"><div className="progress-fill" style={{ width: `${info.p}%` }}></div></div>
+                                    
+                                    <div className="flex justify-between text-[8px] font-black uppercase opacity-70">
+                                        <span>Etapa Atual: {info.p}%</span>
+                                        {!isV5 && <span className="text-red-700">FORMATO INVÁLIDO</span>}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             );
         };
