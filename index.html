@@ -32,8 +32,7 @@
         .tab-btn { padding: 12px 24px; font-weight: 900; font-size: 11px; text-transform: uppercase; border-radius: 14px; transition: 0.3s; opacity: 0.4; }
         .tab-btn.active { opacity: 1; background: #FF5C00; color: white; }
 
-        /* Estilo para a Divisória de Mês */
-        .month-divider { display: flex; items-center: center; margin: 2rem 0 1rem 0; }
+        .month-divider { display: flex; align-items: center; margin: 2rem 0 1rem 0; }
         .month-label { font-size: 10px; font-weight: 900; color: #FF5C00; letter-spacing: 2px; text-transform: uppercase; background: rgba(255,92,0,0.1); padding: 4px 12px; border-radius: 20px; }
         .month-line { flex: 1; height: 1px; background: rgba(255,92,0,0.2); margin-left: 15px; }
 
@@ -71,7 +70,6 @@
             const loadFiles = async () => {
                 const { data } = await supabaseClient.storage.from('atestados').list();
                 if (data) {
-                    // Ordena por data (extraída do nome do arquivo V5-STX-AAAAMMDD-...)
                     const sorted = data
                         .filter(f => f.name.startsWith('V5-'))
                         .sort((a, b) => b.name.split('-')[2].localeCompare(a.name.split('-')[2]));
@@ -79,18 +77,23 @@
                 }
             };
 
-            // Lógica de Agrupamento por Mês
+            // CORREÇÃO: Função que permite acentos e cedilha
+            const limparTexto = (txt) => {
+                return txt.trim()
+                    .replace(/\s+/g, '_')
+                    .replace(/[^a-zA-Z0-9À-ÿ_]/g, ''); 
+            };
+
             const groupedFiles = useMemo(() => {
                 const filtered = files.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
                 const groups = {};
                 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
                 filtered.forEach(f => {
-                    const datePart = f.name.split('-')[2]; // AAAAMMDD
+                    const datePart = f.name.split('-')[2];
                     const year = datePart.substring(0, 4);
                     const monthIdx = parseInt(datePart.substring(4, 6)) - 1;
                     const key = `${months[monthIdx]} ${year}`;
-                    
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(f);
                 });
@@ -105,8 +108,8 @@
                 if (!novaLoja) return;
                 
                 setLoading(true);
-                const nLimpo = novoNome.trim().replace(/[^a-zA-Z0-9]/g, '_');
-                const lLimpa = novaLoja.trim().replace(/[^a-zA-Z0-9]/g, '_');
+                const nLimpo = limparTexto(novoNome);
+                const lLimpa = limparTexto(novaLoja);
                 const newName = `${p[0]}-${p[1]}-${p[2]}-${p[3]}-${nLimpo}-${lLimpa}.jpg`;
 
                 try {
@@ -135,8 +138,8 @@
                 setLoading(true);
                 const form = e.target;
                 const file = form.foto.files[0];
-                const nomeLimpo = form.nome.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
-                const lojaLimpa = form.loja.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
+                const nomeLimpo = limparTexto(form.nome.value);
+                const lojaLimpa = limparTexto(form.loja.value);
                 const dInicio = form.dataInicio.value.replace(/-/g, '');
                 const dFinal = form.dataFinal.value.replace(/-/g, '');
 
@@ -184,7 +187,7 @@
                                 <div className="bg-[#1a1a1a] p-4 rounded-xl border border-white/5">
                                     <input name="foto" type="file" accept="image/*" className="!p-0 text-xs" required />
                                 </div>
-                                <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase tracking-widest text-sm">
+                                <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/40">
                                     {loading ? "SALVANDO..." : "SALVAR NO SUPABASE"}
                                 </button>
                             </form>
@@ -200,16 +203,12 @@
                                 />
                             </div>
 
-                            {Object.keys(groupedFiles).length === 0 && <p className="text-center opacity-20 py-10 font-bold uppercase text-xs">Nenhum registro encontrado</p>}
-                            
-                            {/* RENDERIZAÇÃO POR GRUPOS DE MÊS */}
                             {Object.entries(groupedFiles).map(([month, items]) => (
                                 <div key={month} className="mb-10">
                                     <div className="month-divider">
                                         <span className="month-label">{month}</span>
                                         <div className="month-line"></div>
                                     </div>
-                                    
                                     <div className="space-y-6">
                                         {items.map(f => {
                                             const p = f.name.split('-');
@@ -237,7 +236,7 @@
                                                         </div>
                                                     </div>
                                                     <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase">
-                                                        <span>Progresso do Atestado</span>
+                                                        <span>Progresso</span>
                                                         <span className="text-alcans opacity-100">{(status/4)*100}%</span>
                                                     </div>
                                                     <div className="flex gap-2 mb-4">
