@@ -17,11 +17,11 @@
         
         .card-container { background: #111; border-radius: 2rem; padding: 1.5rem; margin-bottom: 2rem; border: 1px solid rgba(255,255,255,0.03); }
         
-        input { background: #1a1a1a !important; border: none !important; color: white !important; padding: 1rem !important; border-radius: 1rem !important; width: 100%; outline: none; }
+        input { background: #1a1a1a !important; border: none !important; color: white !important; padding: 1rem !important; border-radius: 1rem !important; width: 100%; outline: none; font-size: 14px; }
         input::placeholder { color: #444; }
 
-        .btn-status { font-size: 10px; font-weight: 900; padding: 14px 5px; border-radius: 12px; text-transform: uppercase; flex: 1; text-align: center; background: #1a1a1a; color: #444; }
-        .btn-status.active { background: #FF5C00; color: #fff; }
+        .btn-status { font-size: 10px; font-weight: 900; padding: 14px 5px; border-radius: 12px; text-transform: uppercase; flex: 1; text-align: center; background: #1a1a1a; color: #444; border: 1px solid rgba(255,255,255,0.02); }
+        .btn-status.active { background: #FF5C00; color: #fff; border: none; box-shadow: 0 0 15px rgba(255, 92, 0, 0.2); }
 
         .progress-segment { flex: 1; height: 6px; border-radius: 10px; background: #1a1a1a; }
         .progress-segment.active { background: #FF5C00; }
@@ -55,11 +55,16 @@
                 
                 if (!file) { alert("Selecione uma foto!"); setLoading(false); return; }
 
+                // Limpeza de nomes e lojas para evitar subpastas
                 const nomeLimpo = form.nome.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
                 const lojaLimpa = form.loja.value.trim().replace(/[^a-zA-Z0-9]/g, '_');
-                const dataLimpa = form.data.value.replace(/-/g, '');
+                
+                // Pega as duas datas e remove os traços para o nome do arquivo
+                const dInicio = form.dataInicio.value.replace(/-/g, '');
+                const dFinal = form.dataFinal.value.replace(/-/g, '');
 
-                const fileName = `V5-ST1-${dataLimpa}-${nomeLimpo}-${lojaLimpa}.jpg`;
+                // NOVO FORMATO: V5 - Status - DataInicio - DataFinal - Nome - Loja
+                const fileName = `V5-ST1-${dInicio}-${dFinal}-${nomeLimpo}-${lojaLimpa}.jpg`;
 
                 const { error } = await supabaseClient.storage.from('atestados').upload(fileName, file);
                 if (error) alert("Erro: " + error.message);
@@ -77,48 +82,74 @@
             return (
                 <div className="max-w-xl mx-auto p-6">
                     <header className="flex justify-between items-center py-10">
-                        <h1 className="text-3xl font-black italic text-alcans">ALCANS</h1>
-                        <button onClick={() => window.location.reload()} className="bg-red-600/20 text-red-500 px-4 py-2 rounded-full text-[10px] font-black">LIMPAR ERROS</button>
+                        <div>
+                            <h1 className="text-3xl font-black italic text-alcans leading-none">ALCANS</h1>
+                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest">Gestão de Atestados</p>
+                        </div>
+                        <button onClick={() => window.location.reload()} className="bg-red-600/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-full text-[9px] font-black uppercase">Limpar Erros</button>
                     </header>
 
-                    {/* SEÇÃO DE NOVO REGISTRO (Voltou a ser visível) */}
-                    <div className="card-container mb-10">
-                        <h2 className="text-center font-black mb-6 uppercase tracking-widest text-xs opacity-50">Novo Registro</h2>
+                    {/* FORMULÁRIO COM AS DUAS DATAS (Conforme image_feba5c.png) */}
+                    <div className="card-container mb-10 shadow-2xl">
+                        <h2 className="text-center font-black mb-6 uppercase tracking-widest text-[10px] opacity-40">Novo Registro</h2>
                         <form onSubmit={handleUpload} className="space-y-4">
                             <input name="nome" placeholder="Nome do Colaborador" required />
-                            <input name="loja" placeholder="Loja" required />
-                            <input name="data" type="date" required />
-                            <div className="bg-[#1a1a1a] p-4 rounded-xl text-xs font-bold opacity-50">
-                                <input name="foto" type="file" accept="image/*" className="!p-0" required />
+                            <input name="loja" placeholder="Loja / Unidade" required />
+                            
+                            <div className="flex gap-4">
+                                <div className="flex-1">
+                                    <label className="text-[9px] font-bold opacity-30 ml-2 mb-1 block uppercase">Início</label>
+                                    <input name="dataInicio" type="date" required />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-[9px] font-bold opacity-30 ml-2 mb-1 block uppercase">Fim</label>
+                                    <input name="dataFinal" type="date" required />
+                                </div>
                             </div>
-                            <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/20">
+
+                            <div className="bg-[#1a1a1a] p-4 rounded-xl">
+                                <input name="foto" type="file" accept="image/*" className="!p-0 text-xs" required />
+                            </div>
+                            <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-orange-900/40 mt-4 active:scale-95 transition-all">
                                 {loading ? "ENVIANDO..." : "SALVAR NO SUPABASE"}
                             </button>
                         </form>
                     </div>
 
+                    {/* LISTA DE REGISTROS (Conforme image_0be184.png) */}
                     <div className="space-y-6">
                         {files.map(f => {
                             const p = f.name.split('-');
                             const isV5 = f.name.startsWith('V5-');
+                            
+                            // Extração segura baseada no novo formato de 2 datas
                             const status = isV5 ? parseInt(p[1].replace('ST', '')) : 1;
+                            const dIni = isV5 ? p[2].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1') : "S/ Data";
+                            const dFim = isV5 ? p[3].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1') : "S/ Data";
+                            const nome = isV5 ? p[4].replace(/_/g, ' ') : "ARQUIVO ANTIGO";
+                            const loja = isV5 ? p[5].replace(/_/g, ' ') : "Sem Unidade";
+
                             const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
 
                             return (
-                                <div key={f.name} className="card-container relative">
-                                    <button onClick={() => deleteFile(f.name)} className="absolute top-6 right-6 text-white/10 hover:text-red-500 font-bold">✕</button>
+                                <div key={f.name} className="card-container relative group">
+                                    <button onClick={() => deleteFile(f.name)} className="absolute top-6 right-6 text-white/10 hover:text-red-500 font-bold transition-colors">✕</button>
                                     
-                                    <div className="flex gap-4 mb-6">
-                                        <img src={data.publicUrl} className="w-16 h-16 rounded-2xl object-cover bg-black border border-white/5" />
+                                    <div className="flex gap-5 mb-6">
+                                        <img src={data.publicUrl} className="w-20 h-20 rounded-2xl object-cover bg-black border border-white/5" />
                                         <div>
-                                            <h3 className="font-black text-lg uppercase leading-tight">{isV5 ? p[3].replace(/_/g, ' ') : "ARQUIVO ANTIGO"}</h3>
-                                            <p className="text-[10px] font-bold text-alcans uppercase mt-1">🏢 {isV5 ? p[4].replace(/_/g, ' ') : "S/ UNIDADE"}</p>
+                                            <h3 className="font-black text-xl uppercase leading-tight mb-1">{nome}</h3>
+                                            <p className="text-[10px] font-bold text-alcans uppercase">🏢 {loja}</p>
+                                            <div className="flex gap-3 mt-2 text-[9px] font-black opacity-40 uppercase">
+                                                <span>Início: {dIni}</span>
+                                                <span>Fim: {dFim}</span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-30 uppercase">
-                                        <span>Progresso</span>
-                                        <span>{(status/4)*100}%</span>
+                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase tracking-tighter">
+                                        <span>Progresso do Atestado</span>
+                                        <span className="text-alcans opacity-100">{(status/4)*100}%</span>
                                     </div>
 
                                     <div className="flex gap-2 mb-4">
@@ -126,10 +157,10 @@
                                     </div>
 
                                     <div className="flex gap-2">
-                                        <div className={`btn-status ${status >= 1 ? 'active' : ''}`}>Foto</div>
-                                        <div className={`btn-status ${status >= 2 ? 'active' : ''}`}>Form</div>
+                                        <div className={`btn-status ${status >= 1 ? 'active' : ''}`}>Recebido Foto</div>
+                                        <div className={`btn-status ${status >= 2 ? 'active' : ''}`}>Subiu Form</div>
                                         <div className={`btn-status ${status >= 3 ? 'active' : ''}`}>Físico</div>
-                                        <div className={`btn-status ${status >= 4 ? 'active' : ''}`}>DP</div>
+                                        <div className={`btn-status ${status >= 4 ? 'active' : ''}`}>Entregue DP</div>
                                     </div>
                                 </div>
                             );
