@@ -14,7 +14,7 @@
         :root { --bg: #000; --card: #111; --text: #fff; --alcans: #FF5C00; --input: #1a1a1a; --border: rgba(255,255,255,0.05); }
         .light-mode { --bg: #f3f4f6; --card: #ffffff; --text: #111; --input: #e5e7eb; --border: rgba(0,0,0,0.05); }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; transition: 0.3s; padding-bottom: 50px; }
-        .card-container { background: var(--card); border-radius: 2rem; padding: 1.5rem; border: 1px solid var(--border); position: relative; border-left: 4px solid var(--alcans); }
+        .card-container { background: var(--card); border-radius: 2rem; padding: 1.5rem; border: 1px solid var(--border); position: relative; border-left: 4px solid var(--alcans); transition: opacity 0.3s; }
         input { background: var(--input) !important; border: none !important; color: var(--text) !important; padding: 1rem !important; border-radius: 1rem !important; width: 100%; outline: none; }
         .tab-btn { padding: 12px 24px; font-weight: 900; font-size: 11px; text-transform: uppercase; border-radius: 14px; transition: 0.3s; color: var(--text); opacity: 0.4; }
         .tab-btn.active { opacity: 1; background: var(--alcans); color: white; }
@@ -29,6 +29,7 @@
         .theme-switch::after { content: ''; width: 14px; height: 14px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.3s; }
         .light-mode .theme-switch { background: var(--alcans); }
         .light-mode .theme-switch::after { left: 20px; }
+        .loading-overlay { opacity: 0.5; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -51,7 +52,8 @@
             useEffect(() => { loadFiles(); }, []);
 
             const loadFiles = async () => {
-                const { data, error } = await supabaseClient.storage.from('atestados').list('', {
+                // Adicionando timestamp para evitar cache do navegador
+                const { data } = await supabaseClient.storage.from('atestados').list('', {
                     limit: 100,
                     offset: 0,
                     sortBy: { column: 'name', order: 'desc' },
@@ -83,63 +85,47 @@
                 return groups;
             }, [files, selectedCluster, searchTerm]);
 
-            const handleUpload = async (e) => {
-                e.preventDefault();
+            const handleAction = async (oldName, newName) => {
                 setLoading(true);
-                const form = e.target;
-                const fileName = `V5-${selectedCluster}-ST1-${form.dataInicio.value.replace(/-/g, '')}-${form.dataFinal.value.replace(/-/g, '')}-${limparParaURL(form.nome.value)}-${limparParaURL(form.loja.value)}.jpg`;
-                try {
-                    await supabaseClient.storage.from('atestados').upload(fileName, form.foto.files[0]);
-                    form.reset(); 
-                    await loadFiles(); 
-                    setActiveTab('pesquisa');
-                } catch (e) { alert("Erro ao salvar!"); }
-                setLoading(false);
-            };
-
-            const atualizarInfo = async (oldName) => {
-                const p = oldName.split('-');
-                const novoNome = prompt("Novo nome do colaborador:", p[5].replace(/_/g, ' '));
-                const novaLoja = prompt("Nova cidade/loja:", p[6].replace(/_/g, ' ').replace('.jpg', ''));
-                if (!novoNome || !novaLoja) return;
-                
-                setLoading(true);
-                const newP = [...p];
-                newP[5] = limparParaURL(novoNome);
-                newP[6] = `${limparParaURL(novaLoja)}.jpg`;
-                const newName = newP.join('-');
-
                 try {
                     const { error: copyError } = await supabaseClient.storage.from('atestados').copy(oldName, newName);
                     if (!copyError) {
                         await supabaseClient.storage.from('atestados').remove([oldName]);
+                        // Espera estratégica para sincronização entre dispositivos
                         setTimeout(async () => {
                             await loadFiles();
                             setLoading(false);
-                        }, 1000);
+                        }, 1500);
+                    } else {
+                        throw new Error("Erro na cópia");
                     }
-                } catch (e) { 
-                    alert("Erro na atualização. Tente novamente.");
-                    setLoading(false);
+                } catch (e) {
+                    alert("Erro ao processar. A página será atualizada.");
+                    window.location.reload();
                 }
             };
 
+            const atualizarInfo = async (oldName) => {
+                const p = oldName.split('-');
+                const novoNome = prompt("Novo nome:", p[5].replace(/_/g, ' '));
+                const novaLoja = prompt("Nova loja:", p[6].replace(/_/g, ' ').replace('.jpg', ''));
+                if (!novoNome || !novaLoja) return;
+                
+                const newP = [...p];
+                newP[5] = limparParaURL(novoNome);
+                newP[6] = `${limparParaURL(novaLoja)}.jpg`;
+                await handleAction(oldName, newP.join('-'));
+            };
+
             const atualizarStatus = async (oldName, novoStatus) => {
-                setLoading(true);
                 const p = oldName.split('-');
                 const newP = [...p];
                 newP[2] = `ST${novoStatus}`;
-                const newName = newP.join('-');
-                await supabaseClient.storage.from('atestados').copy(oldName, newName);
-                await supabaseClient.storage.from('atestados').remove([oldName]);
-                setTimeout(async () => {
-                    await loadFiles();
-                    setLoading(false);
-                }, 800);
+                await handleAction(oldName, newP.join('-'));
             };
 
             return (
-                <div className="max-w-xl mx-auto p-6">
+                <div className={`max-w-xl mx-auto p-6 ${loading ? 'loading-overlay' : ''}`}>
                     <header className="pt-8 pb-6 flex justify-between items-center">
                         <div className="w-12"></div>
                         <div className="text-center">
@@ -164,7 +150,14 @@
 
                     {activeTab === 'novo' ? (
                         <div className="card-container">
-                            <form onSubmit={handleUpload} className="space-y-4">
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                setLoading(true);
+                                const form = e.target;
+                                const fileName = `V5-${selectedCluster}-ST1-${form.dataInicio.value.replace(/-/g, '')}-${form.dataFinal.value.replace(/-/g, '')}-${limparParaURL(form.nome.value)}-${limparParaURL(form.loja.value)}.jpg`;
+                                await supabaseClient.storage.from('atestados').upload(fileName, form.foto.files[0]);
+                                form.reset(); await loadFiles(); setActiveTab('pesquisa'); setLoading(false);
+                            }} className="space-y-4">
                                 <input name="nome" placeholder="Nome do Colaborador" required />
                                 <input name="loja" placeholder="Loja / Unidade" required />
                                 <div className="flex gap-4">
@@ -172,7 +165,9 @@
                                     <div className="flex-1"><label className="text-[10px] font-bold opacity-30 uppercase ml-2">Fim</label><input name="dataFinal" type="date" required /></div>
                                 </div>
                                 <input name="foto" type="file" accept="image/*" className="!p-4 text-xs" required />
-                                <button type="submit" disabled={loading} className="w-full bg-[#FF5C00] p-5 rounded-2xl font-black uppercase text-sm text-white shadow-xl">{loading ? "PROCESSANDO..." : "SALVAR"}</button>
+                                <button type="submit" disabled={loading} className="w-full bg-[#FF5C00] p-5 rounded-2xl font-black uppercase text-sm text-white shadow-xl">
+                                    {loading ? "PROCESSANDO..." : "SALVAR"}
+                                </button>
                             </form>
                         </div>
                     ) : (
@@ -196,10 +191,10 @@
                                                         <button onClick={() => atualizarInfo(f.name)} className="opacity-30 hover:opacity-100 hover:text-[#FF5C00] transition-all">
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                                         </button>
-                                                        <button onClick={async () => {if(confirm("Deseja excluir?")){await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles();}}} className="opacity-30 hover:opacity-100 hover:text-red-500 font-bold text-lg">✕</button>
+                                                        <button onClick={async () => {if(confirm("Deseja excluir?")){setLoading(true); await supabaseClient.storage.from('atestados').remove([f.name]); await loadFiles(); setLoading(false);}}} className="opacity-30 hover:opacity-100 hover:text-red-500 font-bold text-lg">✕</button>
                                                     </div>
                                                     <div className="flex gap-5 mb-6">
-                                                        <img src={data.publicUrl} className="w-16 h-16 rounded-2xl object-cover bg-black border border-white/5 shadow-md" />
+                                                        <img src={`${data.publicUrl}?t=${new Date().getTime()}`} className="w-16 h-16 rounded-2xl object-cover bg-black border border-white/5 shadow-md" />
                                                         <div className="flex-1 pr-10">
                                                             <h3 className="font-black text-lg uppercase leading-tight">{p[5].replace(/_/g, ' ')}</h3>
                                                             <p className="text-[11px] font-black text-[#FF5C00] uppercase">🏢 {p[6].replace(/_/g, ' ').replace('.jpg', '')}</p>
@@ -214,7 +209,9 @@
                                                     </div>
                                                     <div className="flex gap-2">
                                                         {['Foto','Form','Físico','DP'].map((label, i) => (
-                                                            <button key={i} onClick={() => atualizarStatus(f.name, i+1)} className={`btn-status ${status >= i+1 ? 'active' : ''}`}>{label}</button>
+                                                            <button key={i} onClick={() => atualizarStatus(f.name, i+1)} className={`btn-status ${status >= i+1 ? 'active' : ''}`}>
+                                                                {loading && status === i+1 ? '...' : label}
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 </div>
