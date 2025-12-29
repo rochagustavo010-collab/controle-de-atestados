@@ -25,7 +25,6 @@
         .tab-btn.active { opacity: 1; background: #FF5C00; color: white; }
         .cluster-opt { flex: 1; padding: 10px; border-radius: 12px; background: var(--input); font-size: 10px; font-weight: 900; text-align: center; cursor: pointer; opacity: 0.4; border: 1px solid transparent; }
         .cluster-opt.active { opacity: 1; border-color: #FF5C00; color: #FF5C00; background: rgba(255,92,0,0.05); }
-        .month-label { font-size: 10px; font-weight: 900; color: #FF5C00; letter-spacing: 2px; text-transform: uppercase; background: rgba(255,92,0,0.1); padding: 4px 12px; border-radius: 20px; }
     </style>
 </head>
 <body>
@@ -67,9 +66,8 @@
                 filtered.forEach(f => {
                     const p = f.name.split('-');
                     const datePart = p[3]; 
-                    const year = datePart.substring(0, 4);
                     const monthIdx = parseInt(datePart.substring(4, 6)) - 1;
-                    const key = `${months[monthIdx]} ${year}`;
+                    const key = `${months[monthIdx]} ${datePart.substring(0, 4)}`;
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(f);
                 });
@@ -80,26 +78,37 @@
                 e.preventDefault();
                 setLoading(true);
                 const form = e.target;
-                const nomeLimpo = limparParaURL(form.nome.value);
-                const lojaLimpa = limparParaURL(form.loja.value);
-                const dInicio = form.dataInicio.value.replace(/-/g, '');
-                const dFinal = form.dataFinal.value.replace(/-/g, '');
-                const fileName = `V5-${selectedCluster}-ST1-${dInicio}-${dFinal}-${nomeLimpo}-${lojaLimpa}.jpg`;
+                const fileName = `V5-${selectedCluster}-ST1-${form.dataInicio.value.replace(/-/g, '')}-${form.dataFinal.value.replace(/-/g, '')}-${limparParaURL(form.nome.value)}-${limparParaURL(form.loja.value)}.jpg`;
                 try {
-                    const { error } = await supabaseClient.storage.from('atestados').upload(fileName, form.foto.files[0]);
-                    if (error) throw error;
+                    await supabaseClient.storage.from('atestados').upload(fileName, form.foto.files[0]);
                     form.reset();
                     await loadFiles();
                     setActiveTab('pesquisa');
-                } catch (e) { alert("Erro: " + e.message); }
+                } catch (e) { alert(e.message); }
+                setLoading(false);
+            };
+
+            const atualizarInfo = async (oldName) => {
+                const p = oldName.split('-');
+                const novoNome = prompt("Novo nome do colaborador:", p[5].replace(/_/g, ' '));
+                const novaLoja = prompt("Nova loja/unidade:", p[6].replace(/_/g, ' ').replace('.jpg', ''));
+                if (!novoNome || !novaLoja) return;
+
+                setLoading(true);
+                p[5] = limparParaURL(novoNome);
+                p[6] = `${limparParaURL(novaLoja)}.jpg`;
+                const newName = p.join('-');
+                await supabaseClient.storage.from('atestados').copy(oldName, newName);
+                await supabaseClient.storage.from('atestados').remove([oldName]);
+                await loadFiles();
                 setLoading(false);
             };
 
             const atualizarStatus = async (oldName, novoStatus) => {
                 setLoading(true);
-                const partes = oldName.split('-');
-                partes[2] = `ST${novoStatus}`;
-                const newName = partes.join('-');
+                const p = oldName.split('-');
+                p[2] = `ST${novoStatus}`;
+                const newName = p.join('-');
                 await supabaseClient.storage.from('atestados').copy(oldName, newName);
                 await supabaseClient.storage.from('atestados').remove([oldName]);
                 await loadFiles();
@@ -109,15 +118,12 @@
             return (
                 <div className="max-w-xl mx-auto p-6 pb-20">
                     <header className="pt-8 pb-6 text-center">
-                        <h1 className="text-3xl font-black italic text-alcans leading-none uppercase tracking-tighter">ALCANS</h1>
-                        <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest mt-1">Painel de Líderes</p>
+                        <h1 className="text-3xl font-black italic text-alcans uppercase">ALCANS</h1>
                     </header>
 
                     <div className="flex gap-2 mb-6">
                         {['CL1', 'CL2', 'CL3'].map((cl, i) => (
-                            <div key={cl} onClick={() => setSelectedCluster(cl)} className={`cluster-opt ${selectedCluster === cl ? 'active' : ''}`}>
-                                CLUSTER {i+1}
-                            </div>
+                            <div key={cl} onClick={() => setSelectedCluster(cl)} className={`cluster-opt ${selectedCluster === cl ? 'active' : ''}`}>CLUSTER {i+1}</div>
                         ))}
                     </div>
 
@@ -132,65 +138,49 @@
                                 <input name="nome" placeholder="Nome do Colaborador" required />
                                 <input name="loja" placeholder="Loja / Unidade" required />
                                 <div className="flex gap-4">
-                                    <div className="flex-1">
-                                        <label className="text-[9px] font-bold opacity-30 ml-2 mb-1 block uppercase">Início</label>
-                                        <input name="dataInicio" type="date" required />
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="text-[9px] font-bold opacity-30 ml-2 mb-1 block uppercase">Fim</label>
-                                        <input name="dataFinal" type="date" required />
-                                    </div>
+                                    <input name="dataInicio" type="date" required />
+                                    <input name="dataFinal" type="date" required />
                                 </div>
-                                <input name="foto" type="file" accept="image/*" className="!p-4 text-xs" required />
-                                <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase text-sm">
-                                    {loading ? "ENVIANDO..." : "SALVAR"}
-                                </button>
+                                <input name="foto" type="file" accept="image/*" required />
+                                <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase">{loading ? "..." : "SALVAR"}</button>
                             </form>
                         </div>
                     ) : (
                         <div>
-                            <input placeholder={`🔍 Buscar em ${selectedCluster}...`} className="mb-6 !bg-alcans/10 !text-alcans" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                            
+                            <input placeholder={`🔍 Buscar em ${selectedCluster}...`} className="mb-6 !bg-alcans/10 !text-alcans" onChange={(e) => setSearchTerm(e.target.value)} />
                             {Object.entries(groupedFiles).map(([month, items]) => (
                                 <div key={month} className="mb-10">
-                                    <div className="flex items-center mb-6"><span className="month-label">{month}</span><div className="flex-1 h-px bg-white/5 ml-4"></div></div>
+                                    <div className="flex items-center mb-6"><span className="text-[10px] font-bold text-alcans uppercase bg-alcans/10 px-3 py-1 rounded-full">{month}</span><div className="flex-1 h-px bg-white/5 ml-4"></div></div>
                                     <div className="space-y-6">
                                         {items.map(f => {
                                             const p = f.name.split('-');
                                             const status = parseInt(p[2].replace('ST', ''));
-                                            const dIni = p[3].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1');
-                                            const dFim = p[4].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1');
                                             const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
                                             return (
                                                 <div key={f.name} className="card-container border-l-4 border-l-[#FF5C00]">
-                                                    <div className="absolute top-6 right-6">
-                                                        <button onClick={async () => {if(confirm("Excluir?")){await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles();}}} className="opacity-20 hover:text-red-500">✕</button>
+                                                    {/* ÍCONES NO CANTO SUPERIOR DIREITO */}
+                                                    <div className="absolute top-6 right-6 flex gap-3">
+                                                        <button onClick={() => atualizarInfo(f.name)} className="opacity-30 hover:opacity-100 hover:text-alcans transition-all">
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                                        </button>
+                                                        <button onClick={async () => {if(confirm("Excluir?")){await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles();}}} className="opacity-30 hover:opacity-100 hover:text-red-500 transition-all font-bold">✕</button>
                                                     </div>
+
                                                     <div className="flex gap-5 mb-6">
                                                         <img src={data.publicUrl} className="w-16 h-16 rounded-2xl object-cover bg-black border border-white/5" />
                                                         <div className="flex-1">
-                                                            {/* Ícone de Papel/Lápis adicionado ao nome */}
-                                                            <div className="flex items-center gap-2">
-                                                                <h3 className="font-black text-lg uppercase leading-tight truncate max-w-[150px]">{p[5].replace(/_/g, ' ')}</h3>
-                                                                <span className="text-alcans text-xs">📝</span>
-                                                            </div>
+                                                            <h3 className="font-black text-lg uppercase leading-tight">{p[5].replace(/_/g, ' ')}</h3>
                                                             <p className="text-[10px] font-bold text-alcans uppercase opacity-60">{p[6].replace(/_/g, ' ').replace('.jpg', '')}</p>
-                                                            {/* Ícone de Calendário adicionado às datas */}
-                                                            <div className="flex items-center gap-1.5 mt-2 opacity-30">
-                                                                <span>📅</span>
-                                                                <p className="text-[9px] font-bold uppercase">{dIni} ATÉ {dFim}</p>
-                                                            </div>
+                                                            <p className="text-[9px] font-bold opacity-30 uppercase mt-2">📅 {p[3].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1')} ATÉ {p[4].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1')}</p>
                                                         </div>
                                                     </div>
-                                                    
-                                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase tracking-tighter">
-                                                        <span>STATUS DE ENVIO</span>
+                                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase">
+                                                        <span>STATUS</span>
                                                         <span className="text-alcans opacity-100">{(status/4)*100}%</span>
                                                     </div>
                                                     <div className="flex gap-1.5 mb-4">
                                                         {[1,2,3,4].map(s => <div key={s} className={`progress-segment ${status >= s ? 'active' : ''}`} />)}
                                                     </div>
-
                                                     <div className="flex gap-2">
                                                         {['Foto','Form','Físico','DP'].map((label, i) => (
                                                             <button key={i} onClick={() => atualizarStatus(f.name, i+1)} className={`btn-status ${status >= i+1 ? 'active' : ''}`}>{label}</button>
