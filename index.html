@@ -16,14 +16,13 @@
         .text-alcans { color: #FF5C00; }
         .bg-alcans { background-color: #FF5C00; }
         .card-container { background: var(--card); border-radius: 2rem; padding: 1.5rem; border: 1px solid var(--border); position: relative; }
-        input, select { background: var(--input) !important; border: none !important; color: var(--text) !important; padding: 1rem !important; border-radius: 1rem !important; width: 100%; outline: none; font-size: 14px; }
+        input { background: var(--input) !important; border: none !important; color: var(--text) !important; padding: 1rem !important; border-radius: 1rem !important; width: 100%; outline: none; font-size: 14px; }
         .btn-status { font-size: 10px; font-weight: 900; padding: 14px 5px; border-radius: 12px; text-transform: uppercase; flex: 1; text-align: center; background: var(--input); color: #666; cursor: pointer; border: none; transition: 0.2s; }
         .btn-status.active { background: #FF5C00; color: #fff; }
         .progress-segment { flex: 1; height: 6px; border-radius: 10px; background: var(--input); transition: 0.3s; }
         .progress-segment.active { background: #FF5C00; }
         .tab-btn { padding: 12px 24px; font-weight: 900; font-size: 11px; text-transform: uppercase; border-radius: 14px; transition: 0.3s; opacity: 0.4; }
         .tab-btn.active { opacity: 1; background: #FF5C00; color: white; }
-        .cluster-selector { display: flex; gap: 8px; margin-bottom: 20px; }
         .cluster-opt { flex: 1; padding: 10px; border-radius: 12px; background: var(--input); font-size: 10px; font-weight: 900; text-align: center; cursor: pointer; opacity: 0.4; border: 1px solid transparent; }
         .cluster-opt.active { opacity: 1; border-color: #FF5C00; color: #FF5C00; background: rgba(255,92,0,0.05); }
         .month-label { font-size: 10px; font-weight: 900; color: #FF5C00; letter-spacing: 2px; text-transform: uppercase; background: rgba(255,92,0,0.1); padding: 4px 12px; border-radius: 20px; }
@@ -63,10 +62,8 @@
                     f.name.startsWith(clusterPrefix) && 
                     f.name.toLowerCase().includes(searchTerm.toLowerCase())
                 );
-                
                 const groups = {};
                 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-                
                 filtered.forEach(f => {
                     const p = f.name.split('-');
                     const datePart = p[3]; 
@@ -87,9 +84,7 @@
                 const lojaLimpa = limparParaURL(form.loja.value);
                 const dInicio = form.dataInicio.value.replace(/-/g, '');
                 const dFinal = form.dataFinal.value.replace(/-/g, '');
-                
                 const fileName = `V5-${selectedCluster}-ST1-${dInicio}-${dFinal}-${nomeLimpo}-${lojaLimpa}.jpg`;
-                
                 try {
                     const { error } = await supabaseClient.storage.from('atestados').upload(fileName, form.foto.files[0]);
                     if (error) throw error;
@@ -114,11 +109,11 @@
             return (
                 <div className="max-w-xl mx-auto p-6 pb-20">
                     <header className="pt-8 pb-6 text-center">
-                        <h1 className="text-3xl font-black italic text-alcans leading-none uppercase">ALCANS</h1>
-                        <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest">Painel de Líderes</p>
+                        <h1 className="text-3xl font-black italic text-alcans leading-none uppercase tracking-tighter">ALCANS</h1>
+                        <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest mt-1">Painel de Líderes</p>
                     </header>
 
-                    <div className="cluster-selector">
+                    <div className="flex gap-2 mb-6">
                         {['CL1', 'CL2', 'CL3'].map((cl, i) => (
                             <div key={cl} onClick={() => setSelectedCluster(cl)} className={`cluster-opt ${selectedCluster === cl ? 'active' : ''}`}>
                                 CLUSTER {i+1}
@@ -163,32 +158,36 @@
                                         {items.map(f => {
                                             const p = f.name.split('-');
                                             const status = parseInt(p[2].replace('ST', ''));
-                                            
-                                            // Correção: Processamento das duas datas
                                             const dIni = p[3].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1');
                                             const dFim = p[4].replace(/(\d{4})(\d{2})(\d{2})/, '$3/$2/$1');
-                                            
                                             const { data } = supabaseClient.storage.from('atestados').getPublicUrl(f.name);
                                             return (
-                                                <div key={f.name} className="card-container">
+                                                <div key={f.name} className="card-container border-l-4 border-l-[#FF5C00]">
                                                     <div className="absolute top-6 right-6">
-                                                        <button onClick={async () => {if(confirm("Excluir?")){await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles();}}} className="opacity-20 hover:text-red-500 font-bold">✕</button>
+                                                        <button onClick={async () => {if(confirm("Excluir?")){await supabaseClient.storage.from('atestados').remove([f.name]); loadFiles();}}} className="opacity-20 hover:text-red-500">✕</button>
                                                     </div>
                                                     <div className="flex gap-5 mb-6">
-                                                        <img src={data.publicUrl} className="w-16 h-16 rounded-2xl object-cover bg-black" />
-                                                        <div>
-                                                            <h3 className="font-black text-lg uppercase leading-tight">{p[5].replace(/_/g, ' ')}</h3>
-                                                            <p className="text-[10px] font-bold text-alcans uppercase">{p[6].replace(/_/g, ' ').replace('.jpg', '')}</p>
-                                                            {/* Exibição corrigida: Início ATÉ Fim */}
-                                                            <p className="text-[9px] font-bold opacity-30 uppercase mt-1">{dIni} ATÉ {dFim}</p>
+                                                        <img src={data.publicUrl} className="w-16 h-16 rounded-2xl object-cover bg-black border border-white/5" />
+                                                        <div className="flex-1">
+                                                            {/* Ícone de Papel/Lápis adicionado ao nome */}
+                                                            <div className="flex items-center gap-2">
+                                                                <h3 className="font-black text-lg uppercase leading-tight truncate max-w-[150px]">{p[5].replace(/_/g, ' ')}</h3>
+                                                                <span className="text-alcans text-xs">📝</span>
+                                                            </div>
+                                                            <p className="text-[10px] font-bold text-alcans uppercase opacity-60">{p[6].replace(/_/g, ' ').replace('.jpg', '')}</p>
+                                                            {/* Ícone de Calendário adicionado às datas */}
+                                                            <div className="flex items-center gap-1.5 mt-2 opacity-30">
+                                                                <span>📅</span>
+                                                                <p className="text-[9px] font-bold uppercase">{dIni} ATÉ {dFim}</p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     
-                                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase">
-                                                        <span>Progresso</span>
+                                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase tracking-tighter">
+                                                        <span>STATUS DE ENVIO</span>
                                                         <span className="text-alcans opacity-100">{(status/4)*100}%</span>
                                                     </div>
-                                                    <div className="flex gap-2 mb-4">
+                                                    <div className="flex gap-1.5 mb-4">
                                                         {[1,2,3,4].map(s => <div key={s} className={`progress-segment ${status >= s ? 'active' : ''}`} />)}
                                                     </div>
 
