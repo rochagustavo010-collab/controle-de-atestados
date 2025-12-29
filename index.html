@@ -19,6 +19,11 @@
         input, select { background: var(--input) !important; border: none !important; color: var(--text) !important; padding: 1rem !important; border-radius: 1rem !important; width: 100%; outline: none; font-size: 14px; }
         .btn-status { font-size: 10px; font-weight: 900; padding: 14px 5px; border-radius: 12px; text-transform: uppercase; flex: 1; text-align: center; background: var(--input); color: #666; cursor: pointer; border: none; transition: 0.2s; }
         .btn-status.active { background: #FF5C00; color: #fff; }
+        
+        /* Estilos da Barra de Progresso Readicionada */
+        .progress-segment { flex: 1; height: 6px; border-radius: 10px; background: var(--input); transition: 0.3s; }
+        .progress-segment.active { background: #FF5C00; }
+        
         .tab-btn { padding: 12px 24px; font-weight: 900; font-size: 11px; text-transform: uppercase; border-radius: 14px; transition: 0.3s; opacity: 0.4; }
         .tab-btn.active { opacity: 1; background: #FF5C00; color: white; }
         .cluster-selector { display: flex; gap: 8px; margin-bottom: 20px; }
@@ -112,7 +117,7 @@
             return (
                 <div className="max-w-xl mx-auto p-6 pb-20">
                     <header className="pt-8 pb-6 text-center">
-                        <h1 className="text-3xl font-black italic text-alcans leading-none">ALCANS</h1>
+                        <h1 className="text-3xl font-black italic text-alcans leading-none uppercase">ALCANS</h1>
                         <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest">Painel de Líderes</p>
                     </header>
 
@@ -124,7 +129,6 @@
                         ))}
                     </div>
 
-                    {/* Nomes simplificados: Novo e Pesquisar */}
                     <div className="flex gap-2 mb-8 bg-[#111] p-1.5 rounded-2xl border border-white/5">
                         <button onClick={() => setActiveTab('novo')} className={`tab-btn flex-1 ${activeTab === 'novo' ? 'active' : ''}`}>Novo</button>
                         <button onClick={() => setActiveTab('pesquisa')} className={`tab-btn flex-1 ${activeTab === 'pesquisa' ? 'active' : ''}`}>Pesquisar</button>
@@ -146,7 +150,6 @@
                                     </div>
                                 </div>
                                 <input name="foto" type="file" accept="image/*" className="!p-4 text-xs" required />
-                                {/* Botão simplificado: Salvar */}
                                 <button type="submit" disabled={loading} className="w-full bg-alcans p-5 rounded-2xl font-black uppercase text-sm">
                                     {loading ? "ENVIANDO..." : "SALVAR"}
                                 </button>
@@ -178,6 +181,16 @@
                                                             <p className="text-[9px] font-bold opacity-30 uppercase mt-1">Início: {dIni}</p>
                                                         </div>
                                                     </div>
+                                                    
+                                                    {/* Barra de Progresso Readicionada */}
+                                                    <div className="flex justify-between items-end mb-2 text-[9px] font-black opacity-20 uppercase">
+                                                        <span>Progresso</span>
+                                                        <span className="text-alcans opacity-100">{(status/4)*100}%</span>
+                                                    </div>
+                                                    <div className="flex gap-2 mb-4">
+                                                        {[1,2,3,4].map(s => <div key={s} className={`progress-segment ${status >= s ? 'active' : ''}`} />)}
+                                                    </div>
+
                                                     <div className="flex gap-2">
                                                         {['Foto','Form','Físico','DP'].map((label, i) => (
                                                             <button key={i} onClick={() => atualizarStatus(f.name, i+1)} className={`btn-status ${status >= i+1 ? 'active' : ''}`}>{label}</button>
